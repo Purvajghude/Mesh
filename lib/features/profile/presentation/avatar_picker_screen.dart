@@ -84,7 +84,7 @@ class _AvatarPickerScreenState extends ConsumerState<AvatarPickerScreen> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: selected ? AppColors.primary : AppColors.border,
+                        color: selected ? AppColors.ink : AppColors.border,
                         width: selected ? 2 : 1,
                       ),
                       color: AppColors.surface,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/avatar_config.dart';
 import '../../../data/models/chat.dart';
@@ -11,6 +12,7 @@ import '../../../data/models/deck_profile.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../chat/presentation/chat_screen.dart';
 import '../../profile/application/profile_providers.dart';
+import '../../../shared/widgets/mesh_lattice.dart';
 import '../application/swipe_providers.dart';
 import 'swipe_card.dart';
 import 'match_overlay.dart';
@@ -105,12 +107,15 @@ class _SwipeDeckScreenState extends ConsumerState<SwipeDeckScreen> {
         if (deck.isEmpty) {
           return _EmptyState(onRefresh: () => ref.invalidate(deckProvider));
         }
-        return Column(
+        return Stack(
           children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                child: CardSwiper(
+            const Positioned.fill(child: MeshLattice()),
+            Column(
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: CardSwiper(
                   controller: _controller,
                   cardsCount: deck.length,
                   numberOfCardsDisplayed: deck.length >= 3 ? 3 : deck.length,
@@ -128,10 +133,12 @@ class _SwipeDeckScreenState extends ConsumerState<SwipeDeckScreen> {
                 ),
               ),
             ),
-            _ActionBar(
-              onNope: () => _controller.swipe(CardSwiperDirection.left),
-              onSuper: () => _controller.swipe(CardSwiperDirection.top),
-              onLike: () => _controller.swipe(CardSwiperDirection.right),
+                _ActionBar(
+                  onNope: () => _controller.swipe(CardSwiperDirection.left),
+                  onSuper: () => _controller.swipe(CardSwiperDirection.top),
+                  onLike: () => _controller.swipe(CardSwiperDirection.right),
+                ),
+              ],
             ),
           ],
         );
@@ -154,26 +161,29 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CircleButton(
+          _ActionButton(
             icon: Icons.close_rounded,
-            color: AppColors.danger,
+            label: 'NOPE',
             size: 60,
             onTap: onNope,
           ),
-          _CircleButton(
+          _ActionButton(
             icon: Icons.bolt_rounded,
-            color: AppColors.cyan,
+            label: 'BOOST',
             size: 48,
+            tone: AppColors.textMuted,
             onTap: onSuper,
           ),
-          _CircleButton(
-            icon: Icons.favorite_rounded,
-            color: AppColors.pink,
+          _ActionButton(
+            icon: Icons.north_east_rounded,
+            label: 'MESH',
             size: 60,
+            filled: true,
             onTap: onLike,
           ),
         ],
@@ -182,39 +192,59 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-class _CircleButton extends StatelessWidget {
-  const _CircleButton({
+/// Affordance comes from fill, not hue: nope is an outline, boost is a subdued
+/// outline, mesh (the like) is the one solid ink fill.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
     required this.icon,
-    required this.color,
+    required this.label,
     required this.size,
     required this.onTap,
+    this.filled = false,
+    this.tone = AppColors.ink,
   });
 
   final IconData icon;
-  final Color color;
+  final String label;
   final double size;
   final VoidCallback onTap;
+  final bool filled;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.surface,
-          border: Border.all(color: color.withValues(alpha: 0.6), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.25),
-              blurRadius: 20,
-              spreadRadius: -2,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: filled ? AppColors.ink : AppColors.surface,
+              border: Border.all(
+                color: filled ? AppColors.ink : tone,
+                width: 1.5,
+              ),
             ),
-          ],
-        ),
-        child: Icon(icon, color: color, size: size * 0.45),
+            child: Icon(
+              icon,
+              color: filled ? AppColors.onInk : tone,
+              size: size * 0.4,
+            ),
+          ),
+          const Gap(8),
+          Text(
+            label,
+            style: AppTypography.mono(
+              fontSize: 9,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }

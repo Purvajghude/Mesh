@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/models/deck_profile.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
 
@@ -16,18 +17,14 @@ class SwipeCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.surfaceHigh, AppColors.surface],
-        ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.12),
-            blurRadius: 40,
-            spreadRadius: -8,
+            color: AppColors.ink.withValues(alpha: 0.06),
+            blurRadius: 28,
+            spreadRadius: -14,
             offset: const Offset(0, 12),
           ),
         ],
@@ -35,25 +32,8 @@ class SwipeCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // Ambient glow.
-          Positioned(
-            top: -60,
-            right: -40,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.25),
-                    blurRadius: 120,
-                    spreadRadius: 40,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Corner registration mark — a quiet print/technical-drawing tell.
+          const Positioned(top: 18, right: 18, child: _RegistrationMark()),
           Padding(
             padding: const EdgeInsets.all(28),
             child: SingleChildScrollView(
@@ -65,20 +45,18 @@ class SwipeCard extends StatelessWidget {
                 children: [
                   const Gap(8),
                   Center(child: MeshAvatar(config: profile.avatar, size: 148)),
-                  const Gap(20),
+                  const Gap(24),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(
-                          profile.name,
-                          style: textTheme.displaySmall,
-                        ),
+                        child: Text(profile.name, style: textTheme.displaySmall),
                       ),
                       _RepBadge(value: profile.reputation),
                     ],
                   ),
                   if (profile.vibe?.isNotEmpty == true) ...[
-                    const Gap(8),
+                    const Gap(10),
                     Text(
                       profile.vibe!,
                       style: textTheme.bodyLarge?.copyWith(
@@ -87,11 +65,13 @@ class SwipeCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const Gap(24),
+                  const Gap(26),
+                  // The real skill-fit score from the recommendation engine
+                  // (Task 7) belongs here; until then we show skills honestly.
                   Text(
-                    'SKILLS',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: AppColors.textFaint,
+                    'SKILLS — ${profile.skills.length}',
+                    style: AppTypography.mono(
+                      fontSize: 10,
                       letterSpacing: 2,
                     ),
                   ),
@@ -103,21 +83,20 @@ class SwipeCard extends StatelessWidget {
                       for (final skill in profile.skills)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
+                            horizontal: 12,
+                            vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.45),
-                            ),
+                            color: AppColors.bg,
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Text(
                             skill,
-                            style: const TextStyle(
-                              color: AppColors.text,
-                              fontWeight: FontWeight.w600,
+                            style: AppTypography.mono(
+                              fontSize: 12,
+                              color: AppColors.ink,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ),
@@ -133,6 +112,26 @@ class SwipeCard extends StatelessWidget {
   }
 }
 
+class _RegistrationMark extends StatelessWidget {
+  const _RegistrationMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 14,
+      height: 14,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.textFaint, width: 1.5),
+            right: BorderSide(color: AppColors.textFaint, width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RepBadge extends StatelessWidget {
   const _RepBadge({required this.value});
 
@@ -141,21 +140,23 @@ class _RepBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, color: AppColors.amber, size: 18),
-          const Gap(4),
+          const Icon(Icons.star_rounded, color: AppColors.ink, size: 15),
+          const Gap(5),
           Text(
             value.toStringAsFixed(1),
-            style: const TextStyle(
-              color: AppColors.text,
+            style: AppTypography.mono(
+              fontSize: 12,
+              color: AppColors.ink,
               fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
             ),
           ),
         ],

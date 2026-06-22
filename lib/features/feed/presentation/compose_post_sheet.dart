@@ -88,16 +88,16 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: sel ? AppColors.primary : AppColors.surfaceHigh,
+                      color: sel ? AppColors.ink : AppColors.surfaceHigh,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: sel ? AppColors.primary : AppColors.border,
+                        color: sel ? AppColors.ink : AppColors.border,
                       ),
                     ),
                     child: Text(
                       '#$c',
                       style: TextStyle(
-                        color: sel ? Colors.white : AppColors.textMuted,
+                        color: sel ? AppColors.onInk : AppColors.textMuted,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

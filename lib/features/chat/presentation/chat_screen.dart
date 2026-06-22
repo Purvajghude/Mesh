@@ -63,14 +63,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.image_rounded, color: AppColors.cyan),
+              leading: const Icon(Icons.image_rounded, color: AppColors.ink),
               title: const Text('Photo'),
               onTap: () => Navigator.pop(ctx, _Attach.image),
             ),
             ListTile(
               leading: const Icon(
                 Icons.insert_drive_file_rounded,
-                color: AppColors.amber,
+                color: AppColors.ink,
               ),
               title: const Text('File'),
               onTap: () => Navigator.pop(ctx, _Attach.file),
@@ -159,7 +159,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       child: Icon(
                                         Icons.auto_awesome,
                                         size: 14,
-                                        color: AppColors.amber,
+                                        color: AppColors.ink,
                                       ),
                                     ),
                                   )
@@ -410,7 +410,7 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = mine ? AppColors.primary : AppColors.surfaceHigh;
+    final color = mine ? AppColors.ink : AppColors.surface;
     final radius = BorderRadius.only(
       topLeft: const Radius.circular(18),
       topRight: const Radius.circular(18),
@@ -437,14 +437,14 @@ class _Bubble extends StatelessWidget {
           ),
         );
       case MessageType.file:
-        content = _FileChip(message: message);
+        content = _FileChip(message: message, mine: mine);
       case MessageType.call:
         content = _CallCard(message: message, mine: mine);
       case MessageType.text:
       case MessageType.voice:
         content = Text(
           message.body ?? '',
-          style: TextStyle(color: mine ? Colors.white : AppColors.text),
+          style: TextStyle(color: mine ? AppColors.onInk : AppColors.text),
         );
     }
 
@@ -457,7 +457,11 @@ class _Bubble extends StatelessWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.72,
       ),
-      decoration: BoxDecoration(color: color, borderRadius: radius),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: radius,
+        border: mine ? null : Border.all(color: AppColors.border),
+      ),
       child: content,
     );
   }
@@ -473,7 +477,7 @@ class _CallCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final video = message.attachmentMeta?['video'] == true;
-    final fg = mine ? Colors.white : AppColors.text;
+    final fg = mine ? AppColors.onInk : AppColors.text;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -499,7 +503,7 @@ class _CallCard extends StatelessWidget {
               child: Text(
                 'tap to join →',
                 style: TextStyle(
-                  color: mine ? Colors.white70 : AppColors.primaryBright,
+                  color: mine ? AppColors.onInk : AppColors.ink,
                   decoration: TextDecoration.underline,
                 ),
               ),
@@ -512,13 +516,15 @@ class _CallCard extends StatelessWidget {
 }
 
 class _FileChip extends StatelessWidget {
-  const _FileChip({required this.message});
+  const _FileChip({required this.message, required this.mine});
 
   final Message message;
+  final bool mine;
 
   @override
   Widget build(BuildContext context) {
     final name = message.attachmentMeta?['filename'] as String? ?? 'file';
+    final fg = mine ? AppColors.onInk : AppColors.ink;
     return GestureDetector(
       onTap: () {
         final url = message.attachmentUrl;
@@ -527,14 +533,14 @@ class _FileChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.insert_drive_file_rounded, color: Colors.white),
+          Icon(Icons.insert_drive_file_rounded, color: fg),
           const Gap(8),
           Flexible(
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: fg,
                 decoration: TextDecoration.underline,
               ),
             ),
@@ -592,7 +598,7 @@ class _Composer extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: const BoxDecoration(
-                  gradient: AppColors.brandGradient,
+                  color: AppColors.ink,
                   shape: BoxShape.circle,
                 ),
                 child: sending
@@ -600,12 +606,12 @@ class _Composer extends StatelessWidget {
                         padding: EdgeInsets.all(14),
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: Colors.white,
+                          color: AppColors.onInk,
                         ),
                       )
                     : const Icon(
                         Icons.arrow_upward_rounded,
-                        color: Colors.white,
+                        color: AppColors.onInk,
                       ),
               ),
             ),

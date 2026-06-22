@@ -86,7 +86,7 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
             const Gap(8),
             Text(
               _codeSent
-                  ? 'We sent a 6-digit code to ${_emailController.text.trim()}.'
+                  ? 'We sent an 8-digit code to ${_emailController.text.trim()}.'
                   : "We'll send you a one-time code. No password needed.",
               style: textTheme.bodyMedium,
             ),

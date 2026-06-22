@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_typography.dart';
 
-/// Assembles the global [ThemeData]. Mesh is Editorial Mono + Pop: a warm
-/// paper canvas, ink text, and a single coral accent.
+/// Assembles the global [ThemeData]. Mesh is Monochrome Editorial: a warm paper
+/// canvas, near-black ink, and warm greys. Emphasis is ink, never colour.
 abstract final class AppTheme {
   static ThemeData get theme {
     const scheme = ColorScheme.light(
-      primary: AppColors.primary,
+      primary: AppColors.ink,
+      onPrimary: AppColors.onInk,
       secondary: AppColors.ink,
-      onSecondary: Colors.white,
+      onSecondary: AppColors.onInk,
       surface: AppColors.surface,
       onSurface: AppColors.ink,
       error: AppColors.danger,
@@ -25,7 +26,7 @@ abstract final class AppTheme {
 
     return base.copyWith(
       textTheme: AppTypography.textTheme(base.textTheme),
-      splashColor: AppColors.primary.withValues(alpha: 0.10),
+      splashColor: AppColors.ink.withValues(alpha: 0.06),
       highlightColor: Colors.transparent,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.bg,
@@ -45,7 +46,9 @@ abstract final class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.ink,
-          foregroundColor: Colors.white,
+          foregroundColor: AppColors.onInk,
+          disabledBackgroundColor: AppColors.surfaceHigh,
+          disabledForegroundColor: AppColors.textFaint,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
@@ -54,6 +57,19 @@ abstract final class AppTheme {
           textStyle: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.ink),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.ink,
+          side: const BorderSide(color: AppColors.ink, width: 1.5),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
       ),
@@ -84,10 +100,23 @@ abstract final class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.16),
+        indicatorColor: AppColors.ink.withValues(alpha: 0.10),
         elevation: 0,
-        labelTextStyle: WidgetStateProperty.all(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? AppColors.ink
+                : AppColors.textFaint,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: states.contains(WidgetState.selected)
+                ? AppColors.ink
+                : AppColors.textFaint,
+          ),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -96,6 +125,11 @@ abstract final class AppTheme {
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.surface,
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: AppColors.ink,
+        contentTextStyle: TextStyle(color: AppColors.onInk),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 /// A selectable chat background. [premium] ones are the gacha-unlockable look
 /// (all selectable for now; locking comes with the cosmetics system).
+///
+/// In the monochrome system these are quiet paper/grey washes — the chat stays
+/// in the same ink-on-paper world as the rest of the app.
 class ChatBackground {
   const ChatBackground({
     required this.key,
@@ -24,35 +27,35 @@ class ChatBackground {
 
 const chatBackgrounds = <ChatBackground>[
   ChatBackground(
-    key: 'aurora',
-    name: 'Aurora',
-    colors: [Color(0xFF0B0B0F), Color(0xFF161028), Color(0xFF0B0B0F)],
+    key: 'paper',
+    name: 'Paper',
+    colors: [Color(0xFFF2EFE8), Color(0xFFEDEAE3)],
   ),
   ChatBackground(
-    key: 'midnight',
-    name: 'Midnight',
-    colors: [Color(0xFF080B14), Color(0xFF0E1530), Color(0xFF080B14)],
+    key: 'linen',
+    name: 'Linen',
+    colors: [Color(0xFFEFEBE2), Color(0xFFE6E1D6)],
   ),
   ChatBackground(
-    key: 'ember',
-    name: 'Ember',
-    colors: [Color(0xFF0B0B0F), Color(0xFF2A0F16), Color(0xFF0B0B0F)],
+    key: 'fog',
+    name: 'Fog',
+    colors: [Color(0xFFEDEDEA), Color(0xFFE2E2DD)],
   ),
   ChatBackground(
-    key: 'forest',
-    name: 'Forest',
-    colors: [Color(0xFF0A0F0D), Color(0xFF0E2620), Color(0xFF0A0F0D)],
+    key: 'slate',
+    name: 'Slate',
+    colors: [Color(0xFFE7E7E4), Color(0xFFD9D9D4)],
   ),
   ChatBackground(
-    key: 'mono',
-    name: 'Mono',
-    colors: [Color(0xFF0B0B0F), Color(0xFF0B0B0F)],
+    key: 'sand',
+    name: 'Sand',
+    colors: [Color(0xFFF0EBE0), Color(0xFFE7E0D0)],
   ),
   ChatBackground(
-    key: 'nebula',
-    name: 'Nebula',
+    key: 'graphite',
+    name: 'Graphite',
     premium: true,
-    colors: [Color(0xFF120A24), Color(0xFF2A1245), Color(0xFF0E0A1F)],
+    colors: [Color(0xFFE4E2DB), Color(0xFFD2CFC4)],
   ),
 ];
 

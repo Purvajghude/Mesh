@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/services/supabase_service.dart';
-import '../../../shared/widgets/gradient_text.dart';
 import '../../chat/presentation/crew_screen.dart';
 import '../../feed/presentation/feed_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
@@ -27,10 +26,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: GradientText(
+        title: Text(
           _index == 0 ? 'mesh' : _titles[_index],
-          gradient: AppColors.brandGradient,
-          style: Theme.of(context).textTheme.titleLarge,
+          style: _index == 0
+              ? AppTypography.display(fontSize: 26, letterSpacing: -1.2)
+              : Theme.of(context).textTheme.titleLarge,
         ),
         actions: [
           if (_index == 3)
@@ -53,8 +53,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.2),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.style_outlined),

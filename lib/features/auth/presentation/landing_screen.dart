@@ -5,7 +5,8 @@ import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../../shared/widgets/gradient_text.dart';
+import '../../../app/theme/app_typography.dart';
+import '../../../shared/widgets/mesh_lattice.dart';
 import '../application/auth_providers.dart';
 
 /// First screen an unauthenticated user sees. GitHub is the hero (auto-imports
@@ -28,10 +29,7 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.surfaceHigh,
-            content: Text("Couldn't sign in: $e"),
-          ),
+          SnackBar(content: Text("Couldn't sign in: $e")),
         );
       }
     } finally {
@@ -47,16 +45,7 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned(
-            top: -120,
-            left: -80,
-            child: _Glow(color: AppColors.primary.withValues(alpha: 0.35)),
-          ),
-          Positioned(
-            bottom: -140,
-            right: -100,
-            child: _Glow(color: AppColors.pink.withValues(alpha: 0.25)),
-          ),
+          const Positioned.fill(child: MeshLattice()),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
@@ -64,29 +53,32 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Spacer(),
-                  GradientText(
+                  Text(
+                    'MESH — FOR BUILDERS',
+                    style: AppTypography.mono(letterSpacing: 2),
+                  ).animate().fadeIn(duration: 500.ms),
+                  const Gap(14),
+                  Text(
                     'mesh',
-                    gradient: AppColors.brandGradient,
-                    style: textTheme.displayLarge?.copyWith(
-                      fontSize: 76,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: AppTypography.display(fontSize: 88),
                   ).animate().fadeIn(duration: 600.ms).slideY(
-                        begin: 0.2,
+                        begin: 0.18,
                         curve: Curves.easeOutCubic,
                       ),
-                  const Gap(8),
+                  const Gap(14),
                   Text(
                     'find people whose skills\nfit yours.',
-                    style: textTheme.headlineMedium?.copyWith(
+                    style: textTheme.headlineSmall?.copyWith(
                       color: AppColors.textMuted,
-                      height: 1.2,
+                      fontWeight: FontWeight.w500,
+                      height: 1.15,
                     ),
                   ).animate(delay: 200.ms).fadeIn(duration: 600.ms),
                   const Spacer(),
                   _AuthButton(
                     label: 'Continue with GitHub',
                     icon: Icons.code_rounded,
+                    filled: true,
                     onPressed: () => _run(repo.signInWithGitHub),
                   ).animate(delay: 400.ms).fadeIn().slideY(begin: 0.3),
                   const Gap(12),
@@ -101,7 +93,7 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
                     child: TextButton(
                       onPressed: _busy ? null : () => context.push('/auth/email'),
                       child: Text(
-                        'or continue with email',
+                        'or use email',
                         style: textTheme.bodyMedium?.copyWith(
                           color: AppColors.textMuted,
                           decoration: TextDecoration.underline,
@@ -109,12 +101,13 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
                       ),
                     ),
                   ).animate(delay: 600.ms).fadeIn(),
-                  const Gap(8),
+                  const Gap(10),
                   Center(
                     child: Text(
-                      'no photos. just skills. zero corporate.',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppColors.textFaint,
+                      'NO PHOTOS · JUST SKILLS',
+                      style: AppTypography.mono(
+                        fontSize: 9.5,
+                        letterSpacing: 1.5,
                       ),
                     ),
                   ).animate(delay: 700.ms).fadeIn(),
@@ -123,29 +116,13 @@ class _LandingScreenState extends ConsumerState<LandingScreen> {
             ),
           ),
           if (_busy)
-            const ColoredBox(
-              color: Color(0x66000000),
-              child: Center(child: CircularProgressIndicator()),
+            ColoredBox(
+              color: AppColors.ink.withValues(alpha: 0.4),
+              child: const Center(
+                child: CircularProgressIndicator(color: AppColors.onInk),
+              ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _Glow extends StatelessWidget {
-  const _Glow({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 300,
-      height: 300,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color, blurRadius: 160, spreadRadius: 60)],
       ),
     );
   }
@@ -156,29 +133,36 @@ class _AuthButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
+    this.filled = false,
     this.iconSize = 22,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
+  final bool filled;
   final double iconSize;
 
   @override
   Widget build(BuildContext context) {
+    final fg = filled ? AppColors.onInk : AppColors.ink;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, color: AppColors.text, size: iconSize),
+        icon: Icon(icon, color: fg, size: iconSize),
         label: Text(label),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.surfaceHigh,
-          foregroundColor: AppColors.text,
+          backgroundColor: filled ? AppColors.ink : Colors.transparent,
+          foregroundColor: fg,
+          elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: AppColors.border),
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: filled ? AppColors.ink : AppColors.ink,
+              width: 1.5,
+            ),
           ),
         ),
       ),

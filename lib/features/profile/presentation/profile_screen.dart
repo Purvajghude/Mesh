@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/avatar_config.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
@@ -55,10 +56,14 @@ class ProfileScreen extends ConsumerWidget {
                           Container(
                             padding: const EdgeInsets.all(6),
                             decoration: const BoxDecoration(
-                              color: AppColors.primary,
+                              color: AppColors.ink,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.edit, size: 16),
+                            child: const Icon(
+                              Icons.edit,
+                              size: 16,
+                              color: AppColors.onInk,
+                            ),
                           ),
                         ],
                       ),
@@ -84,7 +89,7 @@ class ProfileScreen extends ConsumerWidget {
                   Expanded(
                     child: _StatTile(
                       icon: Icons.star_rounded,
-                      iconColor: AppColors.amber,
+                      iconColor: AppColors.ink,
                       label: 'reputation',
                       value: reputation.toStringAsFixed(1),
                     ),
@@ -93,7 +98,7 @@ class ProfileScreen extends ConsumerWidget {
                   Expanded(
                     child: _StatTile(
                       icon: Icons.handshake_rounded,
-                      iconColor: AppColors.cyan,
+                      iconColor: AppColors.ink,
                       label: 'collabs',
                       value: '$collabs',
                     ),
@@ -284,17 +289,24 @@ class _SkillChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(name, style: const TextStyle(color: AppColors.text)),
+          Text(
+            name,
+            style: AppTypography.mono(
+              fontSize: 12.5,
+              color: AppColors.ink,
+              letterSpacing: 0.2,
+            ),
+          ),
           if (verified) ...[
             const Gap(6),
-            const Icon(Icons.verified, size: 14, color: AppColors.cyan),
+            const Icon(Icons.verified, size: 14, color: AppColors.ink),
           ],
         ],
       ),

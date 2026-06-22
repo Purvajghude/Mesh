@@ -56,8 +56,11 @@ class _CrewTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: textTheme.bodyMedium?.copyWith(
           color: match.lastMessage == null
-              ? AppColors.primaryBright
+              ? AppColors.ink
               : AppColors.textMuted,
+          fontWeight: match.lastMessage == null
+              ? FontWeight.w600
+              : FontWeight.w400,
         ),
       ),
       onTap: () => Navigator.of(context).push(

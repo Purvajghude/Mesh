@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/feed_post.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
@@ -48,8 +49,8 @@ class FeedScreen extends ConsumerWidget {
           bottom: 20,
           child: FloatingActionButton(
             onPressed: () => showComposePostSheet(context, ref),
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.edit_rounded, color: Colors.white),
+            backgroundColor: AppColors.ink,
+            child: const Icon(Icons.edit_rounded, color: AppColors.onInk),
           ),
         ),
       ],
@@ -82,16 +83,16 @@ class _ChannelBar extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSel ? AppColors.primary : AppColors.surfaceHigh,
+                color: isSel ? AppColors.ink : AppColors.surfaceHigh,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isSel ? AppColors.primary : AppColors.border,
+                  color: isSel ? AppColors.ink : AppColors.border,
                 ),
               ),
               child: Text(
                 channel == null ? 'all' : '#$channel',
                 style: TextStyle(
-                  color: isSel ? Colors.white : AppColors.textMuted,
+                  color: isSel ? AppColors.onInk : AppColors.textMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -167,10 +168,10 @@ class _PostCardState extends ConsumerState<_PostCard> {
                     Row(
                       children: [
                         Text('#${post.channel}',
-                            style: textTheme.bodySmall
-                                ?.copyWith(color: AppColors.primaryBright)),
+                            style: AppTypography.mono(
+                                fontSize: 10.5, color: AppColors.ink)),
                         Text('  ·  ${_ago(post.createdAt)}',
-                            style: textTheme.bodySmall),
+                            style: AppTypography.mono(fontSize: 10.5)),
                       ],
                     ),
                   ],
@@ -191,13 +192,13 @@ class _PostCardState extends ConsumerState<_PostCard> {
                       ? Icons.arrow_upward_rounded
                       : Icons.arrow_upward_outlined,
                   size: 18,
-                  color: _upvoted ? AppColors.cyan : AppColors.textMuted,
+                  color: _upvoted ? AppColors.ink : AppColors.textMuted,
                 ),
                 const Gap(6),
                 Text(
                   '$_count',
                   style: TextStyle(
-                    color: _upvoted ? AppColors.cyan : AppColors.textMuted,
+                    color: _upvoted ? AppColors.ink : AppColors.textMuted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

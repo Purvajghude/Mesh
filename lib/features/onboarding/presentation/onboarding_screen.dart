@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/services/github_service.dart';
-import '../../../shared/widgets/gradient_text.dart';
 import '../application/onboarding_providers.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -93,11 +93,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       children: [
         const Gap(12),
         Text('build your', style: textTheme.headlineMedium),
-        GradientText(
-          'skill profile',
-          gradient: AppColors.brandGradient,
-          style: textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w700),
-        ),
+        Text('skill profile', style: textTheme.displaySmall),
         const Gap(12),
         Text(
           'Connect GitHub and we’ll read your public repos to auto-detect your '
@@ -161,11 +157,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ],
         ),
         const Gap(4),
-        GradientText(
-          'found ${data.skills.length} skills',
-          gradient: AppColors.brandGradient,
-          style: textTheme.titleLarge,
-        ),
+        Text('found ${data.skills.length} skills', style: textTheme.titleLarge),
         if (data.bio?.isNotEmpty == true) ...[
           const Gap(8),
           Text(data.bio!, style: textTheme.bodyMedium),
@@ -216,21 +208,23 @@ class _SkillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLanguage = skill.category == 'language';
-    // Stronger skills get more presence.
-    final accent = isLanguage ? AppColors.primary : AppColors.cyan;
+    // Stronger skills get more presence: the strongest are filled ink, the rest
+    // sit as outlined chips. Weight, not colour, carries the emphasis.
+    final strong = skill.weight > 0.6;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.10 + 0.12 * skill.weight),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.5)),
+        color: strong ? AppColors.ink : AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: strong ? AppColors.ink : AppColors.border),
       ),
       child: Text(
         skill.name,
-        style: TextStyle(
-          color: AppColors.text,
-          fontWeight: skill.weight > 0.75 ? FontWeight.w700 : FontWeight.w500,
+        style: AppTypography.mono(
+          fontSize: 12.5,
+          color: strong ? AppColors.onInk : AppColors.ink,
+          fontWeight: strong ? FontWeight.w700 : FontWeight.w400,
+          letterSpacing: 0.2,
         ),
       ),
     );

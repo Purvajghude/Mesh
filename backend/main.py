@@ -23,6 +23,7 @@ from slowapi.util import get_remote_address
 from supabase import Client, create_client
 
 import deck as deck_engine
+import feed_ai
 import integrations
 import portfolio as portfolio_engine
 import skills_api
@@ -109,6 +110,10 @@ class PortfolioRequest(BaseModel):
     images_b64: list[str] = []      # raw base64 JPEGs — judged then discarded
     links: list[str] = []
     capture_mode: str = "upload"    # 'camera' (full XP) | 'upload' (reduced)
+
+
+class PostActionRequest(BaseModel):
+    post_id: str
 
 
 # ── Supabase helpers (sync; called via asyncio.to_thread) ────────────────────
@@ -258,6 +263,34 @@ async def portfolio_submit(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return result
+
+
+@app.post("/asks/ai-answer")
+@limiter.limit("15/minute")
+async def ask_ai_answer(
+    request: Request, req: PostActionRequest, uid: str = Depends(current_user)
+):
+    """Generate (and store) an instant AI first-pass answer on your ask."""
+    try:
+        return await asyncio.to_thread(
+            feed_ai.generate_ask_answer, _db, req.post_id, uid
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/feed/moderate")
+@limiter.limit("30/minute")
+async def feed_moderate(
+    request: Request, req: PostActionRequest, uid: str = Depends(current_user)
+):
+    """Quality + safety gate for one of your posts (flag-don't-block, fail-open)."""
+    try:
+        return await asyncio.to_thread(
+            feed_ai.moderate_post, _db, req.post_id, uid
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/pitches")

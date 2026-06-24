@@ -183,6 +183,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Text(_error!, style: const TextStyle(color: AppColors.danger)),
         ],
         const Gap(12),
+        // The culture moment — set the norm right as they feel "it knows me".
+        Row(
+          children: [
+            const Icon(Icons.volunteer_activism_rounded,
+                size: 16, color: AppColors.textMuted),
+            const Gap(8),
+            Expanded(
+              child: Text(
+                'Mesh runs on builders helping builders — the more you help, '
+                'the more you’re seen.',
+                style: textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+        const Gap(12),
         ElevatedButton(
           onPressed: _busy ? null : _confirm,
           child: _busy ? const _Spinner() : const Text("Looks right — let's go"),

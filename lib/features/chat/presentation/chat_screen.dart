@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -13,6 +14,7 @@ import '../../../data/repositories/chat_repository.dart';
 import '../../../data/services/supabase_service.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
 import '../../profile/application/profile_providers.dart';
+import '../../profile/presentation/public_profile_screen.dart';
 import '../application/chat_providers.dart';
 
 /// One-on-one realtime chat with a matched user: text, images, files, and
@@ -114,18 +116,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
   Future<void> _uploadBackground() async {
-    const group = XTypeGroup(
-      label: 'images',
-      extensions: ['jpg', 'jpeg', 'png', 'webp'],
+    // image_picker is more reliable than file_selector for images on Android.
+    final shot = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
     );
-    final file = await openFile(acceptedTypeGroups: [group]);
-    if (file == null) return;
+    if (shot == null) return;
+    if (mounted) _snack('uploading background…');
     try {
-      final bytes = await file.readAsBytes();
+      final bytes = await shot.readAsBytes();
       await ref.read(profileRepositoryProvider).uploadCustomChatBg(
             bytes: bytes,
-            filename: file.name,
-            mime: file.mimeType ?? _mimeFromName(file.name),
+            filename: shot.name,
+            mime: shot.mimeType ?? _mimeFromName(shot.name),
           );
       ref.invalidate(myProfileProvider);
       if (mounted) _snack('background updated');
@@ -396,12 +400,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
-          children: [
-            MeshAvatar(config: widget.match.avatar, size: 36),
-            const Gap(12),
-            Text(widget.match.name),
-          ],
+        title: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  PublicProfileScreen(userId: widget.match.otherId),
+            ),
+          ),
+          child: Row(
+            children: [
+              MeshAvatar(config: widget.match.avatar, size: 36),
+              const Gap(12),
+              Text(widget.match.name),
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -423,10 +435,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ? DecorationImage(
                   image: NetworkImage(customBgUrl),
                   fit: BoxFit.cover,
-                  // Wash the photo toward paper so message bubbles stay legible.
+                  // A light paper scrim OVER the photo so bubbles stay legible
+                  // (srcOver, not lighten — lighten washed the image to white).
                   colorFilter: ColorFilter.mode(
-                    AppColors.bg.withValues(alpha: 0.55),
-                    BlendMode.lighten,
+                    AppColors.bg.withValues(alpha: 0.35),
+                    BlendMode.srcOver,
                   ),
                 )
               : null,

@@ -7,36 +7,69 @@ import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/feed_post.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
+import '../../profile/presentation/public_profile_screen.dart';
 import '../application/feed_providers.dart';
 import 'compose_post_sheet.dart';
+import 'post_detail_screen.dart';
 
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(selectedChannelProvider);
+    final filter = ref.watch(feedFilterProvider);
     final feedAsync = ref.watch(feedProvider);
 
     return Stack(
       children: [
         Column(
           children: [
-            _ChannelBar(selected: selected),
+            _KindFilterBar(selected: filter),
             Expanded(
               child: feedAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Could not load feed: $e')),
                 data: (posts) {
-                  if (posts.isEmpty) {
-                    return const Center(child: Text('nothing here yet — post something!'));
+                  final shown = filter == null
+                      ? posts
+                      : [for (final p in posts) if (p.kind == filter) p];
+                  // The "asks for you" strip: open asks matching your proven
+                  // skills. Shown on the All and Asks views.
+                  final forMe = ref.watch(asksForMeProvider).value ?? const [];
+                  final showStrip =
+                      (filter == null || filter == FeedKind.ask) && forMe.isNotEmpty;
+
+                  Future<void> refresh() async {
+                    ref.invalidate(feedProvider);
+                    ref.invalidate(asksForMeProvider);
+                  }
+
+                  if (shown.isEmpty && !showStrip) {
+                    return RefreshIndicator(
+                      onRefresh: refresh,
+                      child: ListView(
+                        children: [
+                          const Gap(120),
+                          Center(
+                            child: Text(
+                              filter == FeedKind.ask
+                                  ? 'no open asks — be the first to ask for help'
+                                  : 'nothing here yet — share what you’re building!',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
                   }
                   return RefreshIndicator(
-                    onRefresh: () async => ref.invalidate(feedProvider),
-                    child: ListView.builder(
+                    onRefresh: refresh,
+                    child: ListView(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-                      itemCount: posts.length,
-                      itemBuilder: (context, i) => _PostCard(post: posts[i]),
+                      children: [
+                        if (showStrip) _AsksForYouStrip(asks: forMe),
+                        for (final p in shown) _PostCard(post: p),
+                      ],
                     ),
                   );
                 },
@@ -47,10 +80,19 @@ class FeedScreen extends ConsumerWidget {
         Positioned(
           right: 20,
           bottom: 20,
-          child: FloatingActionButton(
-            onPressed: () => showComposePostSheet(context, ref),
+          child: FloatingActionButton.extended(
+            onPressed: () => showComposePostSheet(
+              context,
+              ref,
+              initialKind: filter ?? FeedKind.show,
+            ),
             backgroundColor: AppColors.ink,
-            child: const Icon(Icons.edit_rounded, color: AppColors.onInk),
+            icon: const Icon(Icons.edit_rounded, color: AppColors.onInk),
+            label: Text(
+              filter == FeedKind.ask ? 'Ask' : 'Post',
+              style: const TextStyle(
+                  color: AppColors.onInk, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ],
@@ -58,27 +100,33 @@ class FeedScreen extends ConsumerWidget {
   }
 }
 
-class _ChannelBar extends ConsumerWidget {
-  const _ChannelBar({required this.selected});
+class _KindFilterBar extends ConsumerWidget {
+  const _KindFilterBar({required this.selected});
 
-  final String? selected;
+  final FeedKind? selected;
+
+  static const _items = <({String label, FeedKind? kind})>[
+    (label: 'All', kind: null),
+    (label: 'Asks', kind: FeedKind.ask),
+    (label: 'Shows', kind: FeedKind.show),
+    (label: 'Offers', kind: FeedKind.offer),
+    (label: 'Logs', kind: FeedKind.buildlog),
+  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = <String?>[null, ...feedChannels];
     return SizedBox(
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: items.length,
+        itemCount: _items.length,
         separatorBuilder: (_, _) => const Gap(8),
         itemBuilder: (context, i) {
-          final channel = items[i];
-          final isSel = channel == selected;
+          final it = _items[i];
+          final isSel = it.kind == selected;
           return GestureDetector(
-            onTap: () =>
-                ref.read(selectedChannelProvider.notifier).select(channel),
+            onTap: () => ref.read(feedFilterProvider.notifier).select(it.kind),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               alignment: Alignment.center,
@@ -90,7 +138,7 @@ class _ChannelBar extends ConsumerWidget {
                 ),
               ),
               child: Text(
-                channel == null ? 'all' : '#$channel',
+                it.label,
                 style: TextStyle(
                   color: isSel ? AppColors.onInk : AppColors.textMuted,
                   fontWeight: FontWeight.w600,
@@ -100,6 +148,97 @@ class _ChannelBar extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Horizontal strip of open asks routed to the viewer by their proven skills —
+/// the "you can help here" surface that turns lurkers into helpers.
+class _AsksForYouStrip extends StatelessWidget {
+  const _AsksForYouStrip({required this.asks});
+  final List<FeedPost> asks;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.bolt_rounded, size: 16, color: AppColors.ink),
+            const Gap(6),
+            Text('ASKS THAT MATCH YOUR SKILLS',
+                style: AppTypography.mono(
+                    fontSize: 9.5, letterSpacing: 1.2, color: AppColors.textMuted)),
+          ],
+        ),
+        const Gap(10),
+        SizedBox(
+          height: 132,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: asks.length,
+            separatorBuilder: (_, _) => const Gap(10),
+            itemBuilder: (context, i) {
+              final a = asks[i];
+              return GestureDetector(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) =>
+                      PostDetailScreen(post: a, autofocus: true),
+                )),
+                child: Container(
+                  width: 230,
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: AppColors.ink,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('@${a.username}',
+                          style: AppTypography.mono(
+                              fontSize: 10, color: AppColors.onInkFaint)),
+                      const Gap(6),
+                      Expanded(
+                        child: Text(
+                          a.body,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.onInk, height: 1.3),
+                        ),
+                      ),
+                      const Gap(8),
+                      Row(
+                        children: [
+                          if (a.skillTags.isNotEmpty)
+                            Expanded(
+                              child: Text(
+                                a.skillTags.join(' · '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.mono(
+                                    fontSize: 9.5, color: AppColors.onInkFaint),
+                              ),
+                            ),
+                          const Gap(6),
+                          const Text('help →',
+                              style: TextStyle(
+                                  color: AppColors.onInk,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const Gap(18),
+      ],
     );
   }
 }
@@ -118,7 +257,6 @@ class _PostCardState extends ConsumerState<_PostCard> {
   late int _count = widget.post.upvotes;
 
   Future<void> _toggle() async {
-    // Optimistic update.
     setState(() {
       _upvoted = !_upvoted;
       _count += _upvoted ? 1 : -1;
@@ -127,9 +265,7 @@ class _PostCardState extends ConsumerState<_PostCard> {
       final newState =
           await ref.read(feedRepositoryProvider).toggleUpvote(widget.post.id);
       if (mounted && newState != _upvoted) {
-        setState(() {
-          _upvoted = newState;
-        });
+        setState(() => _upvoted = newState);
       }
     } catch (_) {
       if (mounted) {
@@ -141,94 +277,237 @@ class _PostCardState extends ConsumerState<_PostCard> {
     }
   }
 
+  void _openAuthor() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PublicProfileScreen(userId: widget.post.authorId),
+    ));
+  }
+
+  void _openPost({bool focus = false}) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => PostDetailScreen(post: widget.post, autofocus: focus),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
     final textTheme = Theme.of(context).textTheme;
+    final isAsk = post.isAsk;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
+        // Open asks get a stronger edge — they're a call for help.
+        border: Border.all(
+          color: isAsk && post.status == 'open'
+              ? AppColors.ink
+              : AppColors.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              MeshAvatar(config: post.avatar, size: 40),
+              GestureDetector(
+                onTap: _openAuthor,
+                child: MeshAvatar(config: post.avatar, size: 40),
+              ),
               const Gap(12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(post.authorName, style: textTheme.titleSmall),
-                    Row(
-                      children: [
-                        Text('#${post.channel}',
-                            style: AppTypography.mono(
-                                fontSize: 10.5, color: AppColors.ink)),
-                        Text('  ·  ${_ago(post.createdAt)}',
-                            style: AppTypography.mono(fontSize: 10.5)),
-                      ],
-                    ),
-                  ],
+                child: GestureDetector(
+                  onTap: _openAuthor,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(post.authorName, style: textTheme.titleSmall),
+                      Text(_ago(post.createdAt),
+                          style: AppTypography.mono(fontSize: 10.5)),
+                    ],
+                  ),
                 ),
               ),
+              _KindBadge(kind: post.kind, status: post.status),
             ],
           ),
-          if (post.body.isNotEmpty) ...[
-            const Gap(12),
-            Text(post.body, style: textTheme.bodyLarge?.copyWith(height: 1.35)),
-          ],
-          if (post.imageUrl != null) ...[
-            const Gap(12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.network(
-                post.imageUrl!,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                loadingBuilder: (c, child, p) => p == null
-                    ? child
-                    : const SizedBox(
-                        height: 180,
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                errorBuilder: (c, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          ],
-          const Gap(12),
-          GestureDetector(
-            onTap: _toggle,
-            child: Row(
+          if (isAsk && post.matchScore > 0) ...[
+            const Gap(8),
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  _upvoted
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_upward_outlined,
-                  size: 18,
-                  color: _upvoted ? AppColors.ink : AppColors.textMuted,
-                ),
-                const Gap(6),
+                const Icon(Icons.bolt_rounded, size: 13, color: AppColors.ink),
+                const Gap(4),
                 Text(
-                  '$_count',
-                  style: TextStyle(
-                    color: _upvoted ? AppColors.ink : AppColors.textMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  'matches ${post.matchScore} of your skills',
+                  style: AppTypography.mono(
+                      fontSize: 9.5, color: AppColors.ink, letterSpacing: 0.2),
                 ),
               ],
             ),
+          ],
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openPost(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (post.body.isNotEmpty) ...[
+                  const Gap(12),
+                  Text(post.body,
+                      style: textTheme.bodyLarge?.copyWith(height: 1.35)),
+                ],
+                if (post.imageUrl != null) ...[
+                  const Gap(12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      post.imageUrl!,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (c, child, p) => p == null
+                          ? child
+                          : const SizedBox(
+                              height: 180,
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                      errorBuilder: (c, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ],
+                if (post.skillTags.isNotEmpty) ...[
+                  const Gap(12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final t in post.skillTags) _Tag(label: t),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Gap(12),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _toggle,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _upvoted
+                          ? Icons.arrow_upward_rounded
+                          : Icons.arrow_upward_outlined,
+                      size: 18,
+                      color: _upvoted ? AppColors.ink : AppColors.textMuted,
+                    ),
+                    const Gap(6),
+                    Text('$_count',
+                        style: TextStyle(
+                          color: _upvoted ? AppColors.ink : AppColors.textMuted,
+                          fontWeight: FontWeight.w600,
+                        )),
+                  ],
+                ),
+              ),
+              const Gap(16),
+              GestureDetector(
+                onTap: () => _openPost(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.mode_comment_outlined,
+                        size: 16, color: AppColors.textMuted),
+                    const Gap(6),
+                    Text('${post.commentCount}',
+                        style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              // Asks invite an answer; offers invite a reply — both open the
+              // thread with the composer focused.
+              if (isAsk && post.status != 'solved')
+                _CardAction(label: 'I can help', onTap: () => _openPost(focus: true))
+              else if (post.kind == FeedKind.offer)
+                _CardAction(
+                    label: 'Reach out', onTap: () => _openPost(focus: true)),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+class _KindBadge extends StatelessWidget {
+  const _KindBadge({required this.kind, this.status});
+  final FeedKind kind;
+  final String? status;
+
+  @override
+  Widget build(BuildContext context) {
+    // Solved asks read as resolved; open asks + offers get an inked badge.
+    final solved = kind == FeedKind.ask && status == 'solved';
+    final emphasize = (kind == FeedKind.ask && status == 'open') ||
+        kind == FeedKind.offer;
+    final label = solved ? 'solved' : kind.label.toLowerCase();
+    final bg = solved
+        ? AppColors.success
+        : (emphasize ? AppColors.ink : AppColors.surfaceHigh);
+    final fg = (solved || emphasize) ? AppColors.onInk : AppColors.textMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.mono(fontSize: 9, letterSpacing: 0.8, color: fg),
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label});
+  final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.bg,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Text(label,
+            style: AppTypography.mono(
+                fontSize: 10, color: AppColors.ink, letterSpacing: 0.2)),
+      );
+}
+
+class _CardAction extends StatelessWidget {
+  const _CardAction({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 34,
+        child: ElevatedButton(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+          child: Text(label),
+        ),
+      );
 }
 
 String _ago(DateTime t) {

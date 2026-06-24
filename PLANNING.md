@@ -4,6 +4,103 @@ Running log of what we're building, when, and why. Newest entries at the top.
 
 ---
 
+## 2026-06-24 (session 11) — Product pivot: feed-of-helpers + Phase 0/1 built
+
+**Long product brainstorm (real-world ship, NOT hackathon framing).** Key decision:
+**Mesh's center of gravity moves from the swipe deck → a community FEED of helpers.**
+Matching is the acquisition hook; the recurring loops (help asks + community + reputation)
+are the retention engine. Verified competence is the moat (the trust + routing layer no
+Twitter/Reddit/Discord has). Credits stay deferred (liquidity before economy).
+
+Decisions locked this session:
+- Daily anchor = feed (degrades gracefully); weekly value = human help AI can't give
+  (AI does an instant first-pass, verified humans confirm/deepen); episodic peak = match→collab.
+- Helper retention is a **status game**, not reciprocity → reputation = per-skill help-karma,
+  expert badges, visibility; anti-gaming (trust-weighted, pair-damping, confirmed-value-only).
+- Wedge = one dense community with a recurring cadence (club/cohort) + an event to ignite;
+  concierge the first ~50 asks answered fast. Single-player aha (GitHub "it knows me") bridges
+  cold-start. Onboarding designed: proof→reveal→identity→routing→land in an alive feed.
+- Full build plan = 6 phases (0 foundations → 1 feed post-types → 2 comments/resolution →
+  3 competence routing + AI assist/moderation → 4 reputation → 5 onboarding+OAuth+search →
+  6 safety/economy). ~70% reuse; net-new = push notifs, comments, reputation, routing endpoint.
+
+**Built — Phase 0 (code-only slice):**
+- Public profile screen (`public_profile_screen.dart`) — read-only builder view, reused by
+  chat/feed/search. Chat name→profile (#7). Edit display name (#6). Custom-bg fix (#4:
+  image_picker instead of file_selector + srcOver paper scrim instead of the lighten wash
+  that bleached the image).
+- Deferred (need user's accounts): deploy backend (#8), FCM push.
+
+**Built — Phase 1 (the pivot), migration 0023:**
+- `feed_posts` typed: `kind` (ask/show/offer/buildlog), `skill_tags text[]`, `status`
+  (open/answered/solved), `solved_by/at`; `get_feed` returns kind/tags/status/author_id.
+- Composer = kind picker + per-kind prompt + skill tags (from your skills) + image.
+- Feed = kind filter bar (All/Asks/Shows/Offers/Logs, client-side), per-kind cards, status
+  badges, author→profile, "I can help"/"Reach out" → author profile (threaded answers = Phase 2).
+- Nav reframed: **Feed = home**, swipe → **Discover**, Crew, You. Bank removed from nav
+  (credits deferred; code kept for Phase 6). Verified: analyze clean; get_feed returns new shape.
+
+**Built — Phase 2 (comments + resolution), migration 0024:**
+- `feed_comments` table + `feed_posts.comment_count`; RPCs `add_comment` (bumps count, flips an
+  open ask → answered), `get_post_comments`, `mark_ask_solved` (asker-only; sets status=solved +
+  solved_by = the solving comment's author — the resolution event Phase 4 reputation builds on).
+  `get_feed` now returns comment_count.
+- `PostDetailScreen`: post header + threaded answers + composer; asker sees "this solved it" per
+  peer answer; solved answer highlighted green. Feed cards: body/comment-count/actions open the
+  thread ("I can help" / "Reach out" focus the composer). `FeedComment` model, `postCommentsProvider`.
+- Verified in a rolled-back txn: answer→answered+count1, mark-solved→solved+solved_by=helper. Analyze clean.
+
+**Built — Phase 3 (routing + AI assist), migration 0025 + `backend/feed_ai.py`:**
+- Competence routing in SQL (no backend dep, feed stays resilient): `get_feed` now hides
+  flagged posts + returns `match_score` (overlap of a post's `skill_tags` with the caller's
+  proven skills, weight≥0.4); new `get_asks_for_me` routes open asks to people who've proven
+  the skill (best match first). `feed_posts` gained `ai_answer`, `quality`, `flagged`.
+- Backend (`feed_ai.py` + 2 endpoints): `POST /asks/ai-answer` (Groq llama-3.3-70b instant
+  first-pass on an ask, stored on the post, idempotent, anti-injection fenced) and
+  `POST /feed/moderate` (text + vision quality/safety gate, flag-don't-block, **fail-open**).
+  `FeedAiService` fires both fire-and-forget after a post is created (best-effort; fine if backend down).
+- Flutter: feed shows an **"asks that match your skills"** strip (get_asks_for_me) + a
+  "matches N of your skills" hint on ask cards; post detail shows a pinned **"Mesh AI · first
+  pass"** card. FeedPost gained aiAnswer/matchScore/flagged; `asksForMeProvider`.
+- Verified: routing rolled-back txn (React ask → routed to React-proven helper, match_score 1);
+  backend 401 on both new endpoints; analyze clean. AI features need the tunnel up / backend deployed.
+
+**Built — Phase 4 (reputation), migration 0026:**
+- `help_events` ledger + `help_karma` (per-profile-per-skill cache) + `profiles.help_karma`/
+  `helps_count`. `mark_ask_solved` now awards the solver per-skill karma in the ask's tags —
+  **only when the asker (a different user) confirms** (self-exclusion) and with **pair-damping**
+  (first solve between a pair = 10, repeats = 3) → kills the obvious farms. `get_help_profile`
+  (expert badges, karma≥30 = Expert in X) + `get_top_helpers` (leaderboard, overall or by skill).
+- Flutter: `HelpStat`/`TopHelper` models, repo methods + providers, `LeaderboardScreen` (top
+  helpers), reusable `HelpingSection` on both own + public profiles (helped-count, karma, Expert
+  badges, leaderboard link). Profile stat strips now show **helped** (replaced credits, deferred).
+- Verified rolled-back txn: 1st solve +10, repeat-pair +3, self-solve +0. Analyze clean. No backend dep.
+
+**Built — Phase 5 (discovery + onboarding polish), migration 0027:**
+- **Search** (closes #2): `search_profiles` RPC matches username / display name / skill name
+  (so "@purvaj" and "react" both work), strong helpers first, returns the matched skill as the
+  "why", self-excluded. `SearchScreen` (debounced as-you-type) + a search icon in the Feed/Discover
+  app bar → tap a result → public profile. `SearchResult` model + repo method. Verified: "an"→7,
+  self-search excluded.
+- **Onboarding**: it was already the aha-first flow (GitHub → animated skill reveal → confirm), so
+  refined not rebuilt — added the **culture moment** ("Mesh runs on builders helping builders — the
+  more you help, the more you're seen") at the reveal.
+- **Social login**: already code-complete (OAuth deep-link landed earlier); only the Supabase +
+  Google/GitHub dashboard config (#1) remains — user's to do.
+- Deferred: semantic NL search (needs backend embeddings; DB search covers name + skill for now).
+
+**Backend deploy scaffolding** (so AI runs without the laptop/tunnel): `backend/Dockerfile`
+(python:3.12-slim, requirements.txt, bakes the all-MiniLM-L6-v2 fastembed model so cold starts
+don't download), `backend/.dockerignore` (keeps .env out of the image), root `render.yaml`
+(Render Blueprint, Docker, healthCheck /health, 3 secrets sync:false), `DEPLOY.md` checklist.
+Added `httpx` to requirements (direct import in main.py). User deploys (their Render acct +
+secrets); then point the app via the in-app "AI backend" field or rebake with --dart-define.
+Caveats documented: free-tier spin-down/cold start; fastembed RAM → Starter if add/craft OOMs.
+- Next: Phase 6 (safety/moderation hardening: report/block, server-side enforcement, private
+  buckets/signed URLs, rate limits, DPDP consent) + turn the credit economy back on when liquid.
+
+---
+
 ## 2026-06-23 (session 10) — Economy BUILT + skills/feed/chat features + profile redesign
 
 Built the credit economy (from session-9 design) and a batch of UX upgrades. Migrations

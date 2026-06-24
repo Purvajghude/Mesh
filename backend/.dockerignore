@@ -1,0 +1,9 @@
+# Never bake secrets or local cruft into the image — env vars come from the host.
+.env
+.env.*
+__pycache__/
+*.pyc
+*.log
+uvicorn.log
+.fastembed_cache/
+local_cache/

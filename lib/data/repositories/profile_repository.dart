@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/avatar_config.dart';
+import '../models/help_stat.dart';
 import '../models/my_skill.dart';
+import '../models/search_result.dart';
 import '../services/github_service.dart';
 import '../services/supabase_service.dart';
 
@@ -17,24 +19,57 @@ class ProfileRepository {
     return id;
   }
 
-  Future<Map<String, dynamic>?> myProfile() async {
+  Future<Map<String, dynamic>?> myProfile() => profileById(_userId);
+
+  /// Any user's public profile row (profiles are readable by authenticated).
+  Future<Map<String, dynamic>?> profileById(String id) async {
     final rows = await SupabaseService.client
         .from('profiles')
         .select()
-        .eq('id', _userId)
+        .eq('id', id)
         .limit(1);
     return rows.isEmpty ? null : rows.first;
   }
 
   /// The user's skills, strongest first, with earned level + compound metadata.
-  Future<List<MySkill>> mySkills() async {
+  Future<List<MySkill>> mySkills() => skillsById(_userId);
+
+  /// A user's per-skill helping reputation (for expert badges on profiles).
+  Future<List<HelpStat>> helpProfile(String id) async {
+    final rows = await SupabaseService.client
+        .rpc('get_help_profile', params: {'p_user': id}) as List<dynamic>;
+    return [
+      for (final r in rows) HelpStat.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  /// Search builders by username, display name, or a skill they have.
+  Future<List<SearchResult>> searchProfiles(String query, {int limit = 30}) async {
+    final rows = await SupabaseService.client.rpc('search_profiles',
+        params: {'p_query': query.trim(), 'p_limit': limit}) as List<dynamic>;
+    return [
+      for (final r in rows) SearchResult.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  /// Top helpers overall ([skill] null) or within one skill — the leaderboard.
+  Future<List<TopHelper>> topHelpers({String? skill, int limit = 20}) async {
+    final rows = await SupabaseService.client.rpc('get_top_helpers',
+        params: {'p_skill': skill, 'p_limit': limit}) as List<dynamic>;
+    return [
+      for (final r in rows) TopHelper.fromJson(r as Map<String, dynamic>),
+    ];
+  }
+
+  /// Any user's skills, strongest first (for viewing another builder's profile).
+  Future<List<MySkill>> skillsById(String id) async {
     final rows = await SupabaseService.client
         .from('profile_skills')
         .select(
           'skill_id, weight, xp, source, verified, '
           'skills(name, category, is_compound, blurb)',
         )
-        .eq('profile_id', _userId)
+        .eq('profile_id', id)
         .order('weight', ascending: false);
     return [
       for (final r in rows) MySkill.fromRow(r),
@@ -51,6 +86,12 @@ class ProfileRepository {
     await SupabaseService.client
         .from('profiles')
         .update({'vibe_statement': vibe.trim()}).eq('id', _userId);
+  }
+
+  Future<void> updateDisplayName(String name) async {
+    await SupabaseService.client
+        .from('profiles')
+        .update({'display_name': name.trim()}).eq('id', _userId);
   }
 
   Future<void> updateChatBg(String key) async {

@@ -17,6 +17,7 @@ import '../../../data/services/skill_service.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
 import '../application/profile_providers.dart';
 import 'avatar_picker_screen.dart';
+import 'helping_section.dart';
 
 /// Connectable proof-of-skill providers. GitHub is live; the rest share the
 /// same backend framework and light up as they're wired in.
@@ -62,7 +63,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         final vibe = profile['vibe_statement'] as String?;
         final reputation = (profile['reputation'] as num?)?.toDouble() ?? 5.0;
         final collabs = (profile['collab_count'] as num?)?.toInt() ?? 0;
-        final credits = (profile['credits'] as num?)?.toInt() ?? 0;
+        final helps = (profile['helps_count'] as num?)?.toInt() ?? 0;
+        final karma = (profile['help_karma'] as num?)?.toInt() ?? 0;
+        final myId = profile['id'] as String;
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -77,17 +80,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 displayName: displayName,
                 username: username,
                 onEditAvatar: () => _editAvatar(context, avatar),
+                onEditName: () => _editName(context, displayName),
               ),
               const Gap(20),
               _StatStrip(
                 reputation: reputation,
+                helps: helps,
                 collabs: collabs,
-                credits: credits,
               ),
               const Gap(22),
               _VibePullquote(
                 vibe: vibe,
                 onEdit: () => _editVibe(context, vibe),
+              ),
+              const Gap(34),
+              HelpingSection(
+                userId: myId,
+                helpsCount: helps,
+                karma: karma,
+                isMe: true,
               ),
               const Gap(34),
               _skillsSection(context, skillsAsync),
@@ -882,6 +893,55 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (changed == true) ref.invalidate(myProfileProvider);
   }
 
+  Future<void> _editName(BuildContext context, String? current) async {
+    final controller = TextEditingController(text: current ?? '');
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('your name', style: Theme.of(ctx).textTheme.titleMedium),
+            const Gap(6),
+            Text(
+              'this is how other builders see you.',
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+            const Gap(16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 40,
+              textCapitalization: TextCapitalization.words,
+              style: const TextStyle(color: AppColors.text),
+              decoration: const InputDecoration(hintText: 'e.g. Purvaj G'),
+              onSubmitted: (_) => Navigator.of(ctx).pop(true),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true && controller.text.trim().isNotEmpty) {
+      await ref
+          .read(profileRepositoryProvider)
+          .updateDisplayName(controller.text.trim());
+      ref.invalidate(myProfileProvider);
+    }
+  }
+
   Future<void> _editVibe(BuildContext context, String? current) async {
     final controller = TextEditingController(text: current ?? '');
     final saved = await showModalBottomSheet<bool>(
@@ -936,12 +996,14 @@ class _Masthead extends StatelessWidget {
     required this.displayName,
     required this.username,
     required this.onEditAvatar,
+    required this.onEditName,
   });
 
   final AvatarConfig avatar;
   final String? displayName;
   final String username;
   final VoidCallback onEditAvatar;
+  final VoidCallback onEditName;
 
   @override
   Widget build(BuildContext context) {
@@ -969,25 +1031,38 @@ class _Masthead extends StatelessWidget {
         ),
         const Gap(18),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.display(
-                  fontSize: 30,
-                  letterSpacing: -1.2,
+          child: InkWell(
+            onTap: onEditName,
+            borderRadius: BorderRadius.circular(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.display(
+                          fontSize: 30,
+                          letterSpacing: -1.2,
+                        ),
+                      ),
+                    ),
+                    const Gap(8),
+                    const Icon(Icons.edit_outlined,
+                        size: 16, color: AppColors.textFaint),
+                  ],
                 ),
-              ),
-              if (displayName?.isNotEmpty == true) ...[
-                const Gap(2),
-                Text('@$username',
-                    style: AppTypography.mono(
-                        fontSize: 12, color: AppColors.textMuted)),
+                if (displayName?.isNotEmpty == true) ...[
+                  const Gap(2),
+                  Text('@$username',
+                      style: AppTypography.mono(
+                          fontSize: 12, color: AppColors.textMuted)),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],
@@ -999,13 +1074,13 @@ class _Masthead extends StatelessWidget {
 class _StatStrip extends StatelessWidget {
   const _StatStrip({
     required this.reputation,
+    required this.helps,
     required this.collabs,
-    required this.credits,
   });
 
   final double reputation;
+  final int helps;
   final int collabs;
-  final int credits;
 
   @override
   Widget build(BuildContext context) {
@@ -1020,9 +1095,9 @@ class _StatStrip extends StatelessWidget {
           children: [
             _StatCell(value: reputation.toStringAsFixed(1), label: 'reputation'),
             const _StatDivider(),
-            _StatCell(value: '$collabs', label: 'collabs'),
+            _StatCell(value: '$helps', label: 'helped'),
             const _StatDivider(),
-            _StatCell(value: '$credits ◇', label: 'credits'),
+            _StatCell(value: '$collabs', label: 'collabs'),
           ],
         ),
       ),

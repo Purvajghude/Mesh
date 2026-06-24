@@ -64,8 +64,19 @@ Monochrome editorial. One exception: the match overlay uses full color (the "gac
 - Fonts: Archivo (display), Inter (body), Space Mono (mono)
 - Colors are only used as signal (error, match bloom, pitch pills) — never decoration
 
-## Current Status (2026-06-23)
+## Current Status (2026-06-24)
 
+- 🧭 **Product pivot (session 11): center of gravity = community FEED of helpers**, not the
+  swipe deck. See PLANNING.md session 11 for the full thesis + 6-phase build plan. Matching is
+  the hook; help-asks + community + reputation are the retention engine; verified competence is
+  the moat; credits deferred (liquidity-first).
+- ✅ Phase 1 (migration 0023): typed feed posts (`kind` ask/show/offer/buildlog, `skill_tags`,
+  ask `status`); `get_feed` returns them. Composer = kind picker + tags + image. Feed = kind
+  filter + per-kind cards + author→profile. **Nav reframed: Feed=home, swipe→Discover, Crew, You;
+  Bank removed from nav** (credits deferred, code kept).
+- ✅ Phase 0 slice: public profile screen (reused by chat/feed/search), chat name→profile (#7),
+  edit display name (#6), custom chat-bg fix (#4). Deferred (need accounts): deploy backend (#8),
+  FCM push.
 - ✅ Credit economy (migrations 0018–0021) — conserved `credit_ledger` + `help_requests` +
   escrow lifecycle RPCs; **Bank tab** (wallet + help board + post/accept/confirm). See
   CREDITS_DESIGN.md; later phases (demurrage, auto-release, ratings) deferred.

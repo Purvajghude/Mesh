@@ -26,5 +26,9 @@ class SupabaseService {
   /// The currently signed-in user, or null when signed out.
   static User? get currentUser => auth.currentUser;
 
+  /// The current access token (JWT), sent to the AI backend so it can verify
+  /// who the caller is. Null when signed out.
+  static String? get accessToken => auth.currentSession?.accessToken;
+
   static bool get isSignedIn => currentUser != null;
 }

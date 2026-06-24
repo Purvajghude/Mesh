@@ -77,12 +77,28 @@ class ChatRepository {
     required String matchId,
     required String title,
     String? description,
+    List<String>? skillIds,
   }) async {
     await SupabaseService.client.rpc('log_collab', params: {
       'p_match': matchId,
       'p_title': title,
       'p_description': description,
+      'p_skill_ids': skillIds,
     });
+  }
+
+  /// The skills a collab can be tagged with — the union of both participants'
+  /// skills. Tagging a skill awards both members XP in it (earned expertise).
+  Future<List<({String id, String name})>> collabSkillOptions(
+    String matchId,
+  ) async {
+    final rows = await SupabaseService.client
+        .rpc('collab_skill_options', params: {'p_match': matchId})
+        as List<dynamic>;
+    return [
+      for (final r in rows)
+        (id: r['id'] as String, name: r['name'] as String),
+    ];
   }
 
   /// Live stream of all reactions in a match.

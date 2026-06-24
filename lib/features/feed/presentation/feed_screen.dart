@@ -179,8 +179,28 @@ class _PostCardState extends ConsumerState<_PostCard> {
               ),
             ],
           ),
-          const Gap(12),
-          Text(post.body, style: textTheme.bodyLarge?.copyWith(height: 1.35)),
+          if (post.body.isNotEmpty) ...[
+            const Gap(12),
+            Text(post.body, style: textTheme.bodyLarge?.copyWith(height: 1.35)),
+          ],
+          if (post.imageUrl != null) ...[
+            const Gap(12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.network(
+                post.imageUrl!,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                loadingBuilder: (c, child, p) => p == null
+                    ? child
+                    : const SizedBox(
+                        height: 180,
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                errorBuilder: (c, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
           const Gap(12),
           GestureDetector(
             onTap: _toggle,

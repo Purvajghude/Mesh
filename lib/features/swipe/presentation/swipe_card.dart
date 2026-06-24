@@ -6,6 +6,10 @@ import '../../../app/theme/app_typography.dart';
 import '../../../data/models/deck_profile.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
 
+/// A skill chip carrying its earned mastery level — five pips, filled to the
+/// skill's level. Reads as a skill-tree node: the more you've earned, the more
+/// it lights up. Stays in the monochrome system (level is info, not signal).
+
 /// A single profile card in the swipe deck.
 class SwipeCard extends StatelessWidget {
   const SwipeCard({required this.profile, super.key});
@@ -66,8 +70,12 @@ class SwipeCard extends StatelessWidget {
                     ),
                   ],
                   const Gap(26),
-                  // The real skill-fit score from the recommendation engine
-                  // (Task 7) belongs here; until then we show skills honestly.
+                  // Why the complementarity engine surfaced this builder — the
+                  // "why you're seeing this" signal from the ranking endpoint.
+                  if (profile.explanation?.isNotEmpty == true) ...[
+                    _WhyChip(text: profile.explanation!),
+                    const Gap(22),
+                  ],
                   Text(
                     'SKILLS — ${profile.skills.length}',
                     style: AppTypography.mono(
@@ -81,25 +89,7 @@ class SwipeCard extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       for (final skill in profile.skills)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.bg,
-                            borderRadius: BorderRadius.circular(9),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Text(
-                            skill,
-                            style: AppTypography.mono(
-                              fontSize: 12,
-                              color: AppColors.ink,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
+                        _SkillTag(skill: skill),
                     ],
                   ),
                 ],
@@ -108,6 +98,116 @@ class SwipeCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The recommendation engine's reason for surfacing this builder. Stays in the
+/// monochrome system — it's an intelligence signal, drawn as an inked callout
+/// with a left accent rule, not decoration.
+class _WhyChip extends StatelessWidget {
+  const _WhyChip({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: const BoxDecoration(
+        color: AppColors.surfaceHigh,
+        border: Border(left: BorderSide(color: AppColors.ink, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.hub_outlined, size: 12, color: AppColors.ink),
+              const Gap(6),
+              Text(
+                'WHY YOU MESH',
+                style: AppTypography.mono(
+                  fontSize: 9,
+                  letterSpacing: 2,
+                  color: AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+          const Gap(7),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.35,
+              color: AppColors.ink,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkillTag extends StatelessWidget {
+  const _SkillTag({required this.skill});
+
+  final DeckSkill skill;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            skill.name,
+            style: AppTypography.mono(
+              fontSize: 12,
+              color: AppColors.ink,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const Gap(8),
+          _LevelPips(level: skill.level),
+        ],
+      ),
+    );
+  }
+}
+
+/// Five pips, filled up to [level] — the skill's earned mastery.
+class _LevelPips extends StatelessWidget {
+  const _LevelPips({required this.level});
+
+  final int level;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 1; i <= 5; i++) ...[
+          Container(
+            width: 4,
+            height: 4,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i <= level ? AppColors.ink : AppColors.border,
+            ),
+          ),
+          if (i < 5) const SizedBox(width: 2),
+        ],
+      ],
     );
   }
 }

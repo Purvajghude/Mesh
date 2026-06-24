@@ -40,6 +40,24 @@ class AuthRepository {
     );
   }
 
+  /// Create a new account with email + password. When Supabase email
+  /// confirmation is OFF, this returns a live session immediately. When it's ON,
+  /// [AuthResponse.session] is null and the user must confirm via email first.
+  Future<AuthResponse> signUpWithPassword({
+    required String email,
+    required String password,
+  }) {
+    return _auth.signUp(email: email.trim(), password: password);
+  }
+
+  /// Sign in to an existing account with email + password.
+  Future<AuthResponse> signInWithPassword({
+    required String email,
+    required String password,
+  }) {
+    return _auth.signInWithPassword(email: email.trim(), password: password);
+  }
+
   /// Sends a one-time code to [email]. No redirect/deep-link needed, which
   /// makes it the reliable path for desktop dev testing.
   Future<void> sendEmailOtp(String email) {

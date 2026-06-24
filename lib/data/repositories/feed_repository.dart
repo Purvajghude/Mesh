@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/feed_post.dart';
 import '../services/supabase_service.dart';
 
@@ -27,12 +31,37 @@ class FeedRepository {
   Future<void> createPost({
     required String channel,
     required String body,
+    Uint8List? imageBytes,
+    String? imageName,
+    String? imageMime,
   }) async {
     final me = SupabaseService.currentUser!.id;
+    String? imageUrl;
+    if (imageBytes != null) {
+      imageUrl = await _uploadImage(me, imageBytes, imageName, imageMime);
+    }
     await SupabaseService.client.from('feed_posts').insert({
       'author_id': me,
       'channel': channel,
       'body': body.trim(),
+      'image_url': ?imageUrl,
     });
+  }
+
+  /// Uploads a feed image to the public 'portfolio' bucket and returns its URL.
+  Future<String> _uploadImage(
+    String userId,
+    Uint8List bytes,
+    String? name,
+    String? mime,
+  ) async {
+    final safe = (name ?? 'image.jpg').replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final path = 'feed/$userId/${DateTime.now().millisecondsSinceEpoch}_$safe';
+    await SupabaseService.client.storage.from('portfolio').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: mime ?? 'image/jpeg'),
+        );
+    return SupabaseService.client.storage.from('portfolio').getPublicUrl(path);
   }
 }

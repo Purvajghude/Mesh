@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'core/config/env.dart';
+import 'data/services/api_config.dart';
 import 'data/services/supabase_service.dart';
 
 void main() {
@@ -26,6 +27,7 @@ Future<void> _bootstrap() async {
   try {
     await Env.load();
     await SupabaseService.init();
+    await ApiConfig.init();
   } catch (e, st) {
     debugPrint('BOOTSTRAP FAILED: $e\n$st');
     runApp(_BootstrapError(message: '$e'));

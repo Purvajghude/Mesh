@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/avatar_config.dart';
+import '../../../data/services/pitch_service.dart';
 import '../../../data/models/chat.dart';
 import '../../../data/models/deck_profile.dart';
 import '../../chat/application/chat_providers.dart';
@@ -40,6 +43,22 @@ class _SwipeDeckScreenState extends ConsumerState<SwipeDeckScreen> {
         _ => 'left',
       };
 
+  Future<void> _sendIcebreaker(String matchId) async {
+    try {
+      final pitchSet = await PitchService().fetchPitches(matchId);
+      if (pitchSet.pitches.isEmpty) return;
+      final pitch = pitchSet.pitches.first;
+      await ref.read(chatRepositoryProvider).sendMessage(
+            matchId: matchId,
+            body: 'hey — mesh thinks we should build this 👀\n\n'
+                '${pitch.name}: ${pitch.tagline}\n\n'
+                'first step: ${pitch.firstStep}',
+          );
+    } catch (_) {
+      // best-effort — don't block navigation if pitch fetch or send fails
+    }
+  }
+
   bool _onSwipe(
     List<DeckProfile> deck,
     int previousIndex,
@@ -69,11 +88,16 @@ class _SwipeDeckScreenState extends ConsumerState<SwipeDeckScreen> {
     final myAvatar = AvatarConfig.fromJson(
       myProfile?['avatar_config'] as Map<String, dynamic>?,
     );
-    final sayHi =
-        await showMatchOverlay(context, myAvatar: myAvatar, other: profile);
+    final sayHi = await showMatchOverlay(
+      context,
+      myAvatar: myAvatar,
+      other: profile,
+      matchId: result.matchId,
+    );
 
     if (sayHi == true && result.matchId != null && mounted) {
       ref.invalidate(matchesProvider);
+      unawaited(_sendIcebreaker(result.matchId!));
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ChatScreen(

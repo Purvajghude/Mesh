@@ -1,4 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/avatar_config.dart';
+import '../models/my_skill.dart';
 import '../services/github_service.dart';
 import '../services/supabase_service.dart';
 
@@ -21,14 +26,19 @@ class ProfileRepository {
     return rows.isEmpty ? null : rows.first;
   }
 
-  /// The user's skills, strongest first, with the skill name/category joined in.
-  Future<List<Map<String, dynamic>>> mySkills() async {
+  /// The user's skills, strongest first, with earned level + compound metadata.
+  Future<List<MySkill>> mySkills() async {
     final rows = await SupabaseService.client
         .from('profile_skills')
-        .select('weight, source, verified, skills(name, category)')
+        .select(
+          'skill_id, weight, xp, source, verified, '
+          'skills(name, category, is_compound, blurb)',
+        )
         .eq('profile_id', _userId)
         .order('weight', ascending: false);
-    return List<Map<String, dynamic>>.from(rows);
+    return [
+      for (final r in rows) MySkill.fromRow(r),
+    ];
   }
 
   Future<void> updateAvatar(AvatarConfig config) async {
@@ -47,6 +57,28 @@ class ProfileRepository {
     await SupabaseService.client
         .from('profiles')
         .update({'chat_bg': key}).eq('id', _userId);
+  }
+
+  /// Uploads a custom chat background image to the public 'chat-media' bucket
+  /// and points the profile at it (chat_bg = 'custom').
+  Future<void> uploadCustomChatBg({
+    required Uint8List bytes,
+    required String filename,
+    String? mime,
+  }) async {
+    final userId = _userId;
+    final safe = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final path = 'bg/$userId/${DateTime.now().millisecondsSinceEpoch}_$safe';
+    await SupabaseService.client.storage.from('chat-media').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: mime ?? 'image/jpeg', upsert: true),
+        );
+    final url =
+        SupabaseService.client.storage.from('chat-media').getPublicUrl(path);
+    await SupabaseService.client
+        .from('profiles')
+        .update({'chat_bg': 'custom', 'chat_bg_url': url}).eq('id', userId);
   }
 
   /// Persists a GitHub import: upserts the skill catalog, links the skills to

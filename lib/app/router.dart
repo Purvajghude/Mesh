@@ -6,6 +6,7 @@ import '../data/services/supabase_service.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/auth/presentation/email_auth_screen.dart';
 import '../features/auth/presentation/landing_screen.dart';
+import '../features/auth/presentation/password_auth_screen.dart';
 import '../features/home/presentation/home_shell.dart';
 import '../features/onboarding/application/onboarding_providers.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
@@ -43,6 +44,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/auth/email',
+        builder: (context, state) => const PasswordAuthScreen(),
+      ),
+      GoRoute(
+        path: '/auth/otp',
         builder: (context, state) => const EmailAuthScreen(),
       ),
       GoRoute(

@@ -1,8 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/feed_post.dart';
 import '../application/feed_providers.dart';
@@ -30,6 +34,8 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
   final _controller = TextEditingController();
   String _channel = feedChannels.first;
   bool _busy = false;
+  Uint8List? _imageBytes;
+  String? _imageName;
 
   @override
   void dispose() {
@@ -37,14 +43,33 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final shot = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 80,
+    );
+    if (shot == null) return;
+    final bytes = await shot.readAsBytes();
+    if (mounted) {
+      setState(() {
+        _imageBytes = bytes;
+        _imageName = shot.name;
+      });
+    }
+  }
+
   Future<void> _post() async {
     final body = _controller.text.trim();
-    if (body.isEmpty || _busy) return;
+    if ((body.isEmpty && _imageBytes == null) || _busy) return;
     setState(() => _busy = true);
     try {
-      await ref
-          .read(feedRepositoryProvider)
-          .createPost(channel: _channel, body: body);
+      await ref.read(feedRepositoryProvider).createPost(
+            channel: _channel,
+            body: body,
+            imageBytes: _imageBytes,
+            imageName: _imageName,
+          );
       ref.invalidate(feedProvider);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -115,6 +140,55 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
             style: const TextStyle(color: AppColors.text),
             decoration: const InputDecoration(
               hintText: 'what did you build / what are you looking for?',
+            ),
+          ),
+          if (_imageBytes != null) ...[
+            const Gap(4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Stack(
+                children: [
+                  Image.memory(
+                    _imageBytes!,
+                    width: double.infinity,
+                    height: 180,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        _imageBytes = null;
+                        _imageName = null;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.ink,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded,
+                            size: 18, color: AppColors.onInk),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const Gap(8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _busy ? null : _pickImage,
+              icon: const Icon(Icons.image_outlined,
+                  size: 18, color: AppColors.ink),
+              label: Text(
+                _imageBytes == null ? 'add a photo' : 'change photo',
+                style: AppTypography.mono(
+                    color: AppColors.ink, letterSpacing: 0.4),
+              ),
             ),
           ),
           const Gap(8),

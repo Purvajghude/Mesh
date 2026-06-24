@@ -7,6 +7,8 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../data/models/avatar_config.dart';
 import '../../../data/models/deck_profile.dart';
+import '../../../data/models/pitch.dart';
+import '../../../data/services/pitch_service.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
 import '../../../shared/widgets/mesh_lattice.dart';
 
@@ -34,21 +36,24 @@ Future<bool?> showMatchOverlay(
   BuildContext context, {
   required AvatarConfig myAvatar,
   required DeckProfile other,
+  String? matchId,
 }) {
   return showGeneralDialog<bool>(
     context: context,
     barrierLabel: 'match',
     barrierColor: Colors.black,
     transitionDuration: const Duration(milliseconds: 250),
-    pageBuilder: (_, _, _) => _MatchView(myAvatar: myAvatar, other: other),
+    pageBuilder: (_, _, _) =>
+        _MatchView(myAvatar: myAvatar, other: other, matchId: matchId),
   );
 }
 
 class _MatchView extends StatefulWidget {
-  const _MatchView({required this.myAvatar, required this.other});
+  const _MatchView({required this.myAvatar, required this.other, this.matchId});
 
   final AvatarConfig myAvatar;
   final DeckProfile other;
+  final String? matchId;
 
   @override
   State<_MatchView> createState() => _MatchViewState();
@@ -65,6 +70,10 @@ class _MatchViewState extends State<_MatchView>
 
   late final List<_Particle> _particles = _makeParticles();
 
+  PitchSet? _pitchSet;
+  bool _loadingPitches = false;
+  int _pitchIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +85,7 @@ class _MatchViewState extends State<_MatchView>
       } else {
         _c.forward();
       }
+      if (widget.matchId != null) _loadPitches();
     });
   }
 
@@ -83,6 +93,37 @@ class _MatchViewState extends State<_MatchView>
   void dispose() {
     _c.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPitches() async {
+    if (!mounted) return;
+    setState(() => _loadingPitches = true);
+    try {
+      final set = await PitchService().fetchPitches(widget.matchId!);
+      if (mounted) setState(() { _pitchSet = set; _loadingPitches = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingPitches = false);
+    }
+  }
+
+  Future<void> _reRoll() async {
+    if (widget.matchId == null) return;
+    setState(() => _loadingPitches = true);
+    try {
+      final set = await PitchService().fetchPitches(
+        widget.matchId!,
+        forceRefresh: true,
+      );
+      if (mounted) {
+        setState(() {
+          _pitchSet = set;
+          _pitchIndex = 0;
+          _loadingPitches = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingPitches = false);
+    }
   }
 
   /// Maps the global clock [t] onto a beat that runs from [a] to [b].
@@ -127,6 +168,12 @@ class _MatchViewState extends State<_MatchView>
         final skills = _seg(t, 0.83, 0.95);
         final buttons = _seg(t, 0.88, 1.0);
         final particleP = _seg(t, 0.50, 1.0, Curves.easeOut);
+
+        final hasPitch = _pitchSet != null && _pitchSet!.pitches.isNotEmpty;
+        final pitchCount = _pitchSet?.pitches.length ?? 0;
+        final currentPitch = hasPitch
+            ? _pitchSet!.pitches[_pitchIndex % pitchCount]
+            : null;
 
         // The colour bloom: flashes up at the burst, then settles to a soft
         // glow behind the reveal.
@@ -245,13 +292,31 @@ class _MatchViewState extends State<_MatchView>
                             ),
                           ),
                         ),
-                        if (widget.other.skills.isNotEmpty) ...[
+                        // ── Pitch section ──────────────────────────────
+                        if (widget.matchId != null) ...[
+                          const Gap(16),
+                          if (_loadingPitches)
+                            Opacity(
+                              opacity: skills.clamp(0.0, 1.0),
+                              child: Text(
+                                '// generating pitches...',
+                                textAlign: TextAlign.center,
+                                style: AppTypography.mono(
+                                  fontSize: 10.5,
+                                  color: AppColors.onInkFaint,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            )
+                          else if (currentPitch != null)
+                            _PitchCard(pitch: currentPitch, opacity: skills),
+                        ] else if (widget.other.skills.isNotEmpty) ...[
                           const Gap(12),
                           Opacity(
                             opacity: skills.clamp(0.0, 1.0),
                             child: Text(
                               'THEY BRING '
-                              '${widget.other.skills.take(2).join(" + ").toUpperCase()}',
+                              '${widget.other.skills.take(2).map((s) => s.name).join(" + ").toUpperCase()}',
                               textAlign: TextAlign.center,
                               style: AppTypography.mono(
                                 fontSize: 10.5,
@@ -281,15 +346,48 @@ class _MatchViewState extends State<_MatchView>
                                   ),
                                 ),
                                 const Gap(8),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: const Text(
-                                    'keep swiping',
-                                    style: TextStyle(
-                                      color: AppColors.onInkFaint,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      child: const Text(
+                                        'keep swiping',
+                                        style: TextStyle(
+                                          color: AppColors.onInkFaint,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    // Cycles through the 3 pitches in memory,
+                                    // then calls Claude fresh on the 4th tap.
+                                    if (widget.matchId != null &&
+                                        !_loadingPitches) ...[
+                                      const Text(
+                                        ' · ',
+                                        style: TextStyle(
+                                            color: AppColors.onInkFaint),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          if (hasPitch &&
+                                              _pitchIndex + 1 < pitchCount) {
+                                            setState(() => _pitchIndex++);
+                                          } else {
+                                            _reRoll();
+                                          }
+                                        },
+                                        child: Text(
+                                          hasPitch &&
+                                                  _pitchIndex + 1 < pitchCount
+                                              ? 'next pitch'
+                                              : '↻ re-roll',
+                                          style: const TextStyle(
+                                              color: AppColors.onInkFaint),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ],
                             ),
@@ -304,6 +402,154 @@ class _MatchViewState extends State<_MatchView>
           ),
         );
       },
+    );
+  }
+}
+
+// ── Pitch card ───────────────────────────────────────────────────────────────
+
+class _PitchCard extends StatelessWidget {
+  const _PitchCard({required this.pitch, required this.opacity});
+
+  final Pitch pitch;
+  final double opacity;
+
+  Color _scopeColor() => switch (pitch.scope) {
+        'launch' => _kBloom[3],
+        'month'  => _kBloom[2],
+        _        => _kBloom[0],
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final scopeColor = _scopeColor();
+    return Opacity(
+      opacity: opacity.clamp(0.0, 1.0),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    pitch.name,
+                    style: AppTypography.display(
+                      fontSize: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const Gap(8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: scopeColor.withValues(alpha: 0.6),
+                    ),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    pitch.scope.toUpperCase(),
+                    style: AppTypography.mono(
+                      fontSize: 8,
+                      color: scopeColor,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Gap(4),
+            Text(
+              pitch.tagline,
+              style: const TextStyle(
+                color: AppColors.onInkFaint,
+                fontSize: 12,
+                height: 1.3,
+              ),
+            ),
+            const Gap(10),
+            Row(
+              children: [
+                Expanded(
+                  child: _BringPill(
+                    label: 'YOU',
+                    value: pitch.youBring,
+                    color: _kBloom[0],
+                  ),
+                ),
+                const Gap(6),
+                Expanded(
+                  child: _BringPill(
+                    label: 'THEM',
+                    value: pitch.theyBring,
+                    color: _kBloom[2],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BringPill extends StatelessWidget {
+  const _BringPill({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTypography.mono(
+              fontSize: 8,
+              color: color,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const Gap(2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

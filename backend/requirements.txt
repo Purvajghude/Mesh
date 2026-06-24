@@ -1,0 +1,12 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+supabase>=2.3.0
+groq>=0.11.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+slowapi>=0.1.9
+# Embedding generation (offline, one-time). fastembed is local/ONNX (no key);
+# cohere is an optional fallback if fastembed can't install. The live /deck
+# endpoint needs neither — it only reads precomputed vectors from the DB.
+fastembed>=0.8.0
+# cohere>=5.0.0  # uncomment + set COHERE_API_KEY if fastembed is unavailable

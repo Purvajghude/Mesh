@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for ALL network access in release builds. Flutter only injects
+         this into the debug/profile manifests, so a release APK has no internet
+         (Supabase + the AI backend both fail) unless it's declared here too. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="skillapp"
+        android:label="Mesh"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -23,6 +27,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- OAuth (Google/GitHub) deep-link callback. The provider redirects
+                 to com.mesh.app://login-callback; without this, Android can't
+                 return to the app and the sign-in never completes. Must match
+                 AuthConstants.oauthRedirect AND the Supabase
+                 Auth → URL Configuration → Redirect URLs allowlist. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.mesh.app" android:host="login-callback"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

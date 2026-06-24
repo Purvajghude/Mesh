@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/chat.dart';
 import '../../../data/models/chat_background.dart';
@@ -112,6 +113,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
+  Future<void> _uploadBackground() async {
+    const group = XTypeGroup(
+      label: 'images',
+      extensions: ['jpg', 'jpeg', 'png', 'webp'],
+    );
+    final file = await openFile(acceptedTypeGroups: [group]);
+    if (file == null) return;
+    try {
+      final bytes = await file.readAsBytes();
+      await ref.read(profileRepositoryProvider).uploadCustomChatBg(
+            bytes: bytes,
+            filename: file.name,
+            mime: file.mimeType ?? _mimeFromName(file.name),
+          );
+      ref.invalidate(myProfileProvider);
+      if (mounted) _snack('background updated');
+    } catch (e) {
+      if (mounted) _snack("Couldn't set background: $e");
+    }
+  }
+
   void _pickBackground() {
     showModalBottomSheet<void>(
       context: context,
@@ -128,6 +150,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 style: Theme.of(ctx).textTheme.titleMedium,
               ),
               const Gap(16),
+              InkWell(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _uploadBackground();
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_photo_alternate_outlined,
+                          color: AppColors.ink),
+                      const Gap(12),
+                      Text('Upload your own',
+                          style: Theme.of(ctx).textTheme.titleSmall),
+                    ],
+                  ),
+                ),
+              ),
+              const Gap(18),
+              Text(
+                'OR PICK A WASH',
+                style: AppTypography.mono(
+                    fontSize: 9, letterSpacing: 1.5, color: AppColors.textMuted),
+              ),
+              const Gap(14),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -212,39 +267,99 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _logCollab() async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
+
+    // Skills the collab can be tagged with — tagging awards both of you XP.
+    List<({String id, String name})> options = const [];
+    try {
+      options = await _repo.collabSkillOptions(widget.match.matchId);
+    } catch (_) {
+      // proceed without skill tagging if it can't load
+    }
+    if (!mounted) return;
+    final selected = <String>{};
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('log a collab'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              style: const TextStyle(color: AppColors.text),
-              decoration: const InputDecoration(
-                hintText: 'what are you building?',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('log a collab'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    style: const TextStyle(color: AppColors.text),
+                    decoration: const InputDecoration(
+                      hintText: 'what are you building?',
+                    ),
+                  ),
+                  const Gap(12),
+                  TextField(
+                    controller: descController,
+                    style: const TextStyle(color: AppColors.text),
+                    decoration:
+                        const InputDecoration(hintText: 'details (optional)'),
+                  ),
+                  if (options.isNotEmpty) ...[
+                    const Gap(18),
+                    Text(
+                      'SKILLS YOU USED — you both level up',
+                      style: AppTypography.mono(
+                        fontSize: 9,
+                        letterSpacing: 1.5,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                    const Gap(10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final o in options)
+                          FilterChip(
+                            label: Text(o.name),
+                            selected: selected.contains(o.id),
+                            showCheckmark: false,
+                            backgroundColor: AppColors.bg,
+                            selectedColor: AppColors.ink,
+                            labelStyle: TextStyle(
+                              color: selected.contains(o.id)
+                                  ? AppColors.onInk
+                                  : AppColors.text,
+                              fontSize: 12,
+                            ),
+                            side: const BorderSide(color: AppColors.border),
+                            onSelected: (v) => setLocal(() {
+                              if (v) {
+                                selected.add(o.id);
+                              } else {
+                                selected.remove(o.id);
+                              }
+                            }),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
-            const Gap(12),
-            TextField(
-              controller: descController,
-              style: const TextStyle(color: AppColors.text),
-              decoration: const InputDecoration(hintText: 'details (optional)'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Start collab'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Start collab'),
-          ),
-        ],
       ),
     );
     if (confirmed == true && titleController.text.trim().isNotEmpty) {
@@ -254,8 +369,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         description: descController.text.trim().isEmpty
             ? null
             : descController.text.trim(),
+        skillIds: selected.isEmpty ? null : selected.toList(),
       );
-      if (mounted) _snack('collab started 🚀');
+      if (mounted) {
+        _snack(selected.isEmpty
+            ? 'collab started 🚀'
+            : 'collab logged 🚀 +XP in ${selected.length} '
+                'skill${selected.length > 1 ? "s" : ""}');
+      }
     }
   }
 
@@ -265,8 +386,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final reactions =
         ref.watch(reactionsProvider(widget.match.matchId)).asData?.value ??
         const {};
-    final myBg =
-        ref.watch(myProfileProvider).asData?.value?['chat_bg'] as String?;
+    final profile = ref.watch(myProfileProvider).asData?.value;
+    final myBg = profile?['chat_bg'] as String?;
+    final customBgUrl = profile?['chat_bg_url'] as String?;
+    final useCustom = myBg == 'custom' && customBgUrl != null;
     final bg = backgroundForKey(myBg);
     final me = SupabaseService.currentUser?.id;
 
@@ -294,7 +417,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ],
       ),
       body: Container(
-        decoration: BoxDecoration(gradient: bg.gradient),
+        decoration: BoxDecoration(
+          gradient: useCustom ? null : bg.gradient,
+          image: useCustom
+              ? DecorationImage(
+                  image: NetworkImage(customBgUrl),
+                  fit: BoxFit.cover,
+                  // Wash the photo toward paper so message bubbles stay legible.
+                  colorFilter: ColorFilter.mode(
+                    AppColors.bg.withValues(alpha: 0.55),
+                    BlendMode.lighten,
+                  ),
+                )
+              : null,
+        ),
         child: Column(
           children: [
             Expanded(

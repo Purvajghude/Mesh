@@ -11,6 +11,7 @@ class FeedPost {
     required this.username,
     required this.displayName,
     required this.avatar,
+    this.imageUrl,
   });
 
   final String id;
@@ -22,6 +23,7 @@ class FeedPost {
   final String username;
   final String? displayName;
   final AvatarConfig avatar;
+  final String? imageUrl;
 
   String get authorName =>
       (displayName?.isNotEmpty == true) ? displayName! : '@$username';
@@ -33,6 +35,7 @@ class FeedPost {
       body: json['body'] as String? ?? '',
       upvotes: (json['upvotes'] as num?)?.toInt() ?? 0,
       upvoted: json['upvoted'] == true,
+      imageUrl: json['image_url'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       username: json['username'] as String? ?? '',
       displayName: json['display_name'] as String?,

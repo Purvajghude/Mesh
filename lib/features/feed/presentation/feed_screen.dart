@@ -6,6 +6,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../data/data_providers.dart';
 import '../../../data/models/feed_post.dart';
+import '../../../data/services/supabase_service.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
 import '../../profile/presentation/public_profile_screen.dart';
 import '../application/feed_providers.dart';
@@ -289,6 +290,50 @@ class _PostCardState extends ConsumerState<_PostCard> {
     ));
   }
 
+  void _snack(String m) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+
+  Future<void> _onMenu(String v) async {
+    final post = widget.post;
+    final repo = ref.read(feedRepositoryProvider);
+    try {
+      if (v == 'report') {
+        await repo.report(type: 'post', id: post.id);
+        if (mounted) _snack('Reported — thanks, we’ll take a look.');
+      } else if (v == 'block') {
+        await ref.read(profileRepositoryProvider).blockUser(post.authorId);
+        ref.invalidate(feedProvider);
+        ref.invalidate(asksForMeProvider);
+        if (mounted) {
+          _snack('Blocked @${post.username} — you won’t see their posts.');
+        }
+      } else if (v == 'delete') {
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('Delete this post?'),
+            content: const Text('This can’t be undone.'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel')),
+              ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Delete')),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        await repo.deletePost(post.id);
+        ref.invalidate(feedProvider);
+        if (mounted) _snack('Post deleted.');
+      }
+    } catch (e) {
+      if (mounted) _snack('Something went wrong: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
@@ -331,6 +376,23 @@ class _PostCardState extends ConsumerState<_PostCard> {
                 ),
               ),
               _KindBadge(kind: post.kind, status: post.status),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz_rounded,
+                    size: 18, color: AppColors.textMuted),
+                padding: EdgeInsets.zero,
+                onSelected: _onMenu,
+                itemBuilder: (_) => post.authorId == SupabaseService.currentUser?.id
+                    ? const [
+                        PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                      ]
+                    : [
+                        const PopupMenuItem(
+                            value: 'report', child: Text('Report post')),
+                        PopupMenuItem(
+                            value: 'block',
+                            child: Text('Block @${post.username}')),
+                      ],
+              ),
             ],
           ),
           if (isAsk && post.matchScore > 0) ...[

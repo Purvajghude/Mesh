@@ -52,6 +52,21 @@ class FeedRepository {
         params: {'p_post': postId, 'p_comment': commentId});
   }
 
+  /// Report a post or comment. 3 reports auto-hides it.
+  Future<void> report({
+    required String type, // 'post' | 'comment'
+    required String id,
+    String? reason,
+  }) async {
+    await SupabaseService.client.rpc('report_content',
+        params: {'p_type': type, 'p_id': id, 'p_reason': reason});
+  }
+
+  /// Delete your own post.
+  Future<void> deletePost(String postId) async {
+    await SupabaseService.client.from('feed_posts').delete().eq('id', postId);
+  }
+
   /// Toggles the current user's upvote. Returns the new upvoted state.
   Future<bool> toggleUpvote(String postId) async {
     final res = await SupabaseService.client.rpc(
@@ -101,7 +116,8 @@ class FeedRepository {
     String? mime,
   ) async {
     final safe = (name ?? 'image.jpg').replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-    final path = 'feed/$userId/${DateTime.now().millisecondsSinceEpoch}_$safe';
+    // uid-first path so the own-folder storage policy passes.
+    final path = '$userId/feed/${DateTime.now().millisecondsSinceEpoch}_$safe';
     await SupabaseService.client.storage.from('portfolio').uploadBinary(
           path,
           bytes,

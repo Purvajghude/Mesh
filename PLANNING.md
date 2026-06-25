@@ -96,8 +96,68 @@ don't download), `backend/.dockerignore` (keeps .env out of the image), root `re
 Added `httpx` to requirements (direct import in main.py). User deploys (their Render acct +
 secrets); then point the app via the in-app "AI backend" field or rebake with --dart-define.
 Caveats documented: free-tier spin-down/cold start; fastembed RAM → Starter if add/craft OOMs.
-- Next: Phase 6 (safety/moderation hardening: report/block, server-side enforcement, private
-  buckets/signed URLs, rate limits, DPDP consent) + turn the credit economy back on when liquid.
+**Built — Phase 6 (safety hardening), migrations 0028 + 0029:**
+- **Report + block** (`content_reports`, `user_blocks`, `feed_posts/comments.report_count`):
+  `report_content` (3 reports auto-hide a post via `flagged`, or hide a comment via report_count≥3),
+  `block_user`/`unblock_user`, `is_blocked`. All readers (`get_feed`, `get_asks_for_me`,
+  `get_post_comments`, `search_profiles`) now filter blocked users + hidden content **server-side**
+  (a client can't opt out). UI: ⋮ menus on feed cards / post detail / comments (report, block author,
+  delete own) + block/report on public profiles.
+- **Anti-spam:** `rl_check` BEFORE-INSERT triggers on feed_posts (≤20/hr) + feed_comments (≤40/hr).
+- **Consent:** DPDP line on signup ("…we process your skills and activity to match and rank builders").
+- **0029 security tightening:** Phases 2–6 functions were revoked `from anon` but not `from public`,
+  so anon (public key) could still call them — revoked `from public` + re-granted authenticated.
+  Verified `has_function_privilege`: anon=false / authenticated=true on all; rl_check fully locked.
+- Verified rolled-back txn: block hides post (1→0), 3 reports → flagged=true. Analyze clean.
+  Advisor: **0 ERRORs** (only the project's standard definer-WARN pattern + pre-existing INFOs).
+- **Deferred (noted):** private buckets + signed URLs (needs coordinated upload-path refactor),
+  webhook-based server-side AI moderation enforcement, FCM push, semantic NL search, and turning
+  the credit economy back on (liquidity-first). **The 6-phase feed-of-helpers plan is COMPLETE.**
+
+**Fix (post-plan): GitHub import ownership.** Bug: onboarding imported skills from ANY typed
+username and marked them `verified:true` → anyone could claim anyone's skills. Fix:
+`AuthRepository.verifiedGithubUsername` trusts ONLY a GitHub-OAuth identity; onboarding imports
+from the verified username (locked, no typing) → `saveGithubImport(verified:true)`; a typed
+username still imports a starter list but `verified:false` with a "connect to verify" nudge.
+Real verification path (bio-nonce challenge) already exists in the profile connect flow.
+
+**Private chat images + storage path scoping (migration 0030).** DM photos/files were
+world-readable public URLs. New chat attachments now go to a PRIVATE `chat-attachments`
+bucket; the message stores the storage path (not a URL) and the chat renders it via a 1h
+**signed URL** generated only for the two match participants (storage RLS: `is_match_participant`
+on the matchId path segment). Old public attachments still render (backward compatible). Public
+buckets (chat-media bg, portfolio feed images) tightened to **own-folder uploads only**
+(`(storage.foldername)[1] = auth.uid()`); upload paths changed to uid-first. Verified: bucket
+private, policies in place, analyze clean. **Decision: feed/profile images stay broadly-visible
+(inherently public in a social app); only chat DMs are private.**
+
+**FCM push — Stage 1 DONE (client + tokens), migration 0031.** User created the Firebase
+project + Android app + placed `google-services.json` in android/app/. Wired: google-services
+Gradle plugin (settings.gradle.kts 4.4.3 + app plugin), `firebase_core`+`firebase_messaging`
+deps, `Firebase.initializeApp()` in bootstrap (Android-guarded so Windows/web don't crash),
+`PushService` (permission + token getToken/onTokenRefresh → upsert to `device_tokens`, called
+on HomeShell mount; unregister on sign-out), `device_tokens` table (RLS owner). **APK builds
+with Firebase** (55MB). **Stage 2 PENDING (backend send):** needs the Firebase service-account
+JSON as a Render env var; then build the FCM send helper + a pg_net trigger (feed_comments
+insert → backend /internal/notify → FCM to the asker's tokens) for "your ask was answered" etc.
+
+**FCM Stage 2 BUILT (backend send + trigger).** `backend/push.py` (FCM HTTP v1 via
+google-auth service account, prunes dead tokens), `POST /internal/notify` (shared-secret
+gated, called by the DB not users), `google-auth` in requirements. Migration 0032: `pg_net`
+extension + `app_config` table (RLS, no client policies) + `notify_on_comment` AFTER INSERT
+trigger on feed_comments → `net.http_post` to /internal/notify → push to the asker (skips
+self). notify_url + notify_secret stored in app_config via MCP (NOT committed — secret out of
+git). **Remaining (user):** add `NOTIFY_SECRET` env on Render (= the app_config value) + push
+the repo so Render redeploys the new backend (FIREBASE_SERVICE_ACCOUNT already set). No new APK
+needed — Stage-1 client already registers tokens + receives. pg_net is fire-and-forget so a
+notify failure never blocks commenting.
+
+**FCM "someone needs your skill" added (migration 0033).** `/internal/notify` now takes a
+`user_ids` LIST (one backend call fans out). New trigger `notify_on_new_ask` on feed_posts: a
+new ask with skill_tags → notifies up to 25 builders who've PROVEN a matching skill (weight≥0.4,
+mirrors get_asks_for_me routing, excludes author). `notify_on_comment` updated to the list
+payload. Verified recipient query (React ask → 2 proven-React helpers, author excluded). Same
+deploy step (push backend + NOTIFY_SECRET on Render); main.py changed so the push must include it.
 
 ---
 

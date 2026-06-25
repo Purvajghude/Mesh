@@ -6,6 +6,7 @@ import 'package:gap/gap.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../data/services/github_service.dart';
+import '../../auth/application/auth_providers.dart';
 import '../application/onboarding_providers.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -21,6 +22,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _busy = false;
   String? _error;
   GithubImport? _result;
+  // True only when the import came from a GitHub account the user proved they
+  // own (GitHub OAuth). Drives whether the skills are saved as verified.
+  bool _ownershipVerified = false;
 
   @override
   void dispose() {
@@ -29,14 +33,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _import() async {
+    // Prefer the OAuth-verified GitHub identity; a typed username can't be
+    // trusted, so anything imported from it is saved unverified.
+    final verified = ref.read(authRepositoryProvider).verifiedGithubUsername;
+    final username = (verified ?? _usernameController.text).trim();
+    if (username.isEmpty) {
+      setState(() => _error = 'Enter your GitHub username.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
+      _ownershipVerified = verified != null;
     });
     try {
-      final data = await ref
-          .read(githubServiceProvider)
-          .importProfile(_usernameController.text);
+      final data = await ref.read(githubServiceProvider).importProfile(username);
       setState(() => _result = data);
     } catch (e) {
       setState(() => _error = '$e');
@@ -50,7 +61,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (data == null) return;
     setState(() => _busy = true);
     try {
-      await ref.read(profileRepositoryProvider).saveGithubImport(data);
+      await ref
+          .read(profileRepositoryProvider)
+          .saveGithubImport(data, verified: _ownershipVerified);
       ref.read(onboardingStatusProvider.notifier).markOnboarded();
       // Router redirects to /home once onboarded flips.
     } catch (e) {
@@ -88,6 +101,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Widget _buildConnect(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    // If they signed in with GitHub we already KNOW (and trust) their username
+    // — import from it, no typing, skills come out verified.
+    final verifiedUser = ref.read(authRepositoryProvider).verifiedGithubUsername;
+    final hasVerified = verifiedUser != null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -96,21 +114,56 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         Text('skill profile', style: textTheme.displaySmall),
         const Gap(12),
         Text(
-          'Connect GitHub and we’ll read your public repos to auto-detect your '
-          'languages and tools. No manual typing.',
+          hasVerified
+              ? 'You signed in with GitHub — we’ll read your public repos and '
+                  'turn them into verified, earned skills.'
+              : 'We’ll read public GitHub repos to auto-detect languages and '
+                  'tools.',
           style: textTheme.bodyMedium,
         ),
         const Gap(32),
-        TextField(
-          controller: _usernameController,
-          autofocus: true,
-          style: const TextStyle(color: AppColors.text),
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.code_rounded, color: AppColors.textMuted),
-            hintText: 'your github username',
+        if (hasVerified)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.ink,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified, size: 18, color: AppColors.onInk),
+                const Gap(10),
+                Expanded(
+                  child: Text('@$verifiedUser',
+                      style: AppTypography.mono(
+                          fontSize: 14, color: AppColors.onInk)),
+                ),
+                Text('verified',
+                    style: AppTypography.mono(
+                        fontSize: 9,
+                        letterSpacing: 1.2,
+                        color: AppColors.onInkFaint)),
+              ],
+            ),
+          )
+        else ...[
+          TextField(
+            controller: _usernameController,
+            autofocus: true,
+            style: const TextStyle(color: AppColors.text),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.code_rounded, color: AppColors.textMuted),
+              hintText: 'your github username',
+            ),
+            onSubmitted: (_) => _busy ? null : _import(),
           ),
-          onSubmitted: (_) => _busy ? null : _import(),
-        ),
+          const Gap(10),
+          Text(
+            'Skills imported from a typed username stay unverified. To earn a '
+            'verified badge, sign in with GitHub or connect it from your profile.',
+            style: textTheme.bodySmall?.copyWith(color: AppColors.textFaint),
+          ),
+        ],
         if (_error != null) ...[
           const Gap(12),
           Text(_error!, style: const TextStyle(color: AppColors.danger)),
@@ -120,7 +173,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           onPressed: _busy ? null : _import,
           child: _busy
               ? const _Spinner()
-              : const Text('Import my skills'),
+              : Text(hasVerified ? 'Import my skills' : 'Import (unverified)'),
         ),
         const Spacer(),
         Center(

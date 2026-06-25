@@ -94,6 +94,18 @@ class ProfileRepository {
         .update({'display_name': name.trim()}).eq('id', _userId);
   }
 
+  /// Block a user — hides their posts, comments, and search presence both ways.
+  Future<void> blockUser(String id) =>
+      SupabaseService.client.rpc('block_user', params: {'p_target': id});
+
+  Future<void> unblockUser(String id) =>
+      SupabaseService.client.rpc('unblock_user', params: {'p_target': id});
+
+  /// Report a user for review.
+  Future<void> reportUser(String id, {String? reason}) =>
+      SupabaseService.client.rpc('report_content',
+          params: {'p_type': 'user', 'p_id': id, 'p_reason': reason});
+
   Future<void> updateChatBg(String key) async {
     await SupabaseService.client
         .from('profiles')
@@ -109,7 +121,8 @@ class ProfileRepository {
   }) async {
     final userId = _userId;
     final safe = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-    final path = 'bg/$userId/${DateTime.now().millisecondsSinceEpoch}_$safe';
+    // uid-first path so the own-folder storage policy passes.
+    final path = '$userId/bg/${DateTime.now().millisecondsSinceEpoch}_$safe';
     await SupabaseService.client.storage.from('chat-media').uploadBinary(
           path,
           bytes,
@@ -123,8 +136,11 @@ class ProfileRepository {
   }
 
   /// Persists a GitHub import: upserts the skill catalog, links the skills to
-  /// the user, and stamps the profile as onboarded.
-  Future<void> saveGithubImport(GithubImport data) async {
+  /// the user, and stamps the profile as onboarded. [verified] is true ONLY
+  /// when ownership was proven (GitHub OAuth) — a typed username imports skills
+  /// but leaves them unverified.
+  Future<void> saveGithubImport(GithubImport data,
+      {required bool verified}) async {
     final client = SupabaseService.client;
     final userId = _userId;
 
@@ -155,7 +171,7 @@ class ProfileRepository {
                 'profile_id': userId,
                 'skill_id': idByName[s.name],
                 'source': 'github',
-                'verified': true,
+                'verified': verified,
                 'weight': s.weight,
               },
         ],

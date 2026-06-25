@@ -4,9 +4,12 @@ import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
+import '../../../data/data_providers.dart';
 import '../../../data/models/avatar_config.dart';
 import '../../../data/models/my_skill.dart';
+import '../../../data/services/supabase_service.dart';
 import '../../../shared/widgets/mesh_avatar.dart';
+import '../../feed/application/feed_providers.dart';
 import '../application/profile_providers.dart';
 import 'helping_section.dart';
 
@@ -24,7 +27,38 @@ class PublicProfileScreen extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          if (userId != SupabaseService.currentUser?.id)
+            PopupMenuButton<String>(
+              onSelected: (v) async {
+                final repo = ref.read(profileRepositoryProvider);
+                final messenger = ScaffoldMessenger.of(context);
+                final nav = Navigator.of(context);
+                try {
+                  if (v == 'block') {
+                    await repo.blockUser(userId);
+                    ref.invalidate(feedProvider);
+                    nav.pop();
+                    messenger.showSnackBar(const SnackBar(
+                        content: Text('Blocked — you won’t see their content.')));
+                  } else if (v == 'report') {
+                    await repo.reportUser(userId);
+                    messenger.showSnackBar(const SnackBar(
+                        content: Text('Reported — thanks, we’ll take a look.')));
+                  }
+                } catch (e) {
+                  messenger.showSnackBar(
+                      SnackBar(content: Text('Something went wrong: $e')));
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'block', child: Text('Block')),
+                PopupMenuItem(value: 'report', child: Text('Report user')),
+              ],
+            ),
+        ],
+      ),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load profile: $e')),

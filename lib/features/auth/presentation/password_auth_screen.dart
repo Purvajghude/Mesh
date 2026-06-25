@@ -163,6 +163,15 @@ class _PasswordAuthScreenState extends ConsumerState<PasswordAuthScreen> {
                     )
                   : Text(_register ? 'Create account' : 'Sign in'),
             ),
+            if (_register) ...[
+              const Gap(10),
+              Text(
+                'By creating an account you agree to Mesh’s Terms, and that we '
+                'process your skills and activity to match and rank builders.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodySmall?.copyWith(color: AppColors.textFaint),
+              ),
+            ],
             const Gap(12),
             Center(
               child: TextButton(

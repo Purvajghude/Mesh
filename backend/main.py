@@ -26,6 +26,7 @@ import deck as deck_engine
 import feed_ai
 import integrations
 import portfolio as portfolio_engine
+import push
 import skills_api
 from engine import generate_pitches
 
@@ -114,6 +115,13 @@ class PortfolioRequest(BaseModel):
 
 class PostActionRequest(BaseModel):
     post_id: str
+
+
+class NotifyRequest(BaseModel):
+    user_ids: list[str]
+    title: str
+    body: str
+    data: dict[str, Any] = {}
 
 
 # ── Supabase helpers (sync; called via asyncio.to_thread) ────────────────────
@@ -291,6 +299,27 @@ async def feed_moderate(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/internal/notify")
+async def internal_notify(
+    req: NotifyRequest, x_notify_secret: str | None = Header(default=None)
+):
+    """Send a push to a user. Called by a DB trigger (pg_net), not end users, so
+    it's gated by a shared secret rather than a user JWT."""
+    secret = os.environ.get("NOTIFY_SECRET")
+    if not secret or x_notify_secret != secret:
+        raise HTTPException(status_code=401, detail="bad notify secret")
+    try:
+        sent = 0
+        for uid in req.user_ids:
+            res = await asyncio.to_thread(
+                push.send_to_user, _db, uid, req.title, req.body, req.data
+            )
+            sent += res.get("sent", 0)
+        return {"sent": sent, "recipients": len(req.user_ids)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/pitches")

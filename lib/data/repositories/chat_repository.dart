@@ -43,7 +43,9 @@ class ChatRepository {
     });
   }
 
-  /// Uploads bytes to the chat-media bucket and posts an attachment message.
+  /// Uploads bytes to the PRIVATE chat-attachments bucket (readable only by the
+  /// two match participants) and posts an attachment message. The storage path
+  /// is stored in the message meta; it's rendered via a short-lived signed URL.
   Future<void> sendAttachment({
     required String matchId,
     required Uint8List bytes,
@@ -54,24 +56,34 @@ class ChatRepository {
   }) async {
     final me = SupabaseService.currentUser!.id;
     final safe = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-    final path = '$matchId/${DateTime.now().millisecondsSinceEpoch}_$safe';
+    // Path {matchId}/{uid}/{file} — the participant-scoped storage policy keys
+    // off the matchId segment.
+    final path = '$matchId/$me/${DateTime.now().millisecondsSinceEpoch}_$safe';
 
-    await SupabaseService.client.storage.from('chat-media').uploadBinary(
+    await SupabaseService.client.storage.from('chat-attachments').uploadBinary(
           path,
           bytes,
           fileOptions: FileOptions(contentType: mime),
         );
-    final url =
-        SupabaseService.client.storage.from('chat-media').getPublicUrl(path);
 
     await SupabaseService.client.from('messages').insert({
       'match_id': matchId,
       'sender_id': me,
       'type': type.name,
-      'attachment_url': url,
-      'attachment_meta': {...?meta, 'filename': filename},
+      'attachment_meta': {
+        ...?meta,
+        'filename': filename,
+        'path': path,
+        'private': true,
+      },
     });
   }
+
+  /// A short-lived (1h) signed URL for a private chat attachment.
+  Future<String> signedAttachmentUrl(String path) => SupabaseService
+      .client.storage
+      .from('chat-attachments')
+      .createSignedUrl(path, 3600);
 
   Future<void> logCollab({
     required String matchId,

@@ -570,21 +570,22 @@ class _Bubble extends StatelessWidget {
     Widget content;
     switch (message.type) {
       case MessageType.image:
-        content = ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Image.network(
-            message.attachmentUrl!,
-            width: 220,
-            fit: BoxFit.cover,
-            loadingBuilder: (c, child, p) => p == null
-                ? child
+        final path = message.attachmentMeta?['path'] as String?;
+        if (path != null) {
+          // Private attachment → resolve a short-lived signed URL.
+          content = FutureBuilder<String>(
+            future: _signChatAttachment(path),
+            builder: (c, snap) => snap.hasData
+                ? _chatImage(snap.data!)
                 : const SizedBox(
                     width: 220,
                     height: 160,
                     child: Center(child: CircularProgressIndicator()),
                   ),
-          ),
-        );
+          );
+        } else {
+          content = _chatImage(message.attachmentUrl!);
+        }
       case MessageType.file:
         content = _FileChip(message: message, mine: mine);
       case MessageType.call:
@@ -675,9 +676,12 @@ class _FileChip extends StatelessWidget {
     final name = message.attachmentMeta?['filename'] as String? ?? 'file';
     final fg = mine ? AppColors.onInk : AppColors.ink;
     return GestureDetector(
-      onTap: () {
-        final url = message.attachmentUrl;
-        if (url != null) launchUrl(Uri.parse(url));
+      onTap: () async {
+        final path = message.attachmentMeta?['path'] as String?;
+        final url = path != null
+            ? await _signChatAttachment(path)
+            : message.attachmentUrl;
+        if (url != null) await launchUrl(Uri.parse(url));
       },
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -782,3 +786,30 @@ String _mimeFromName(String name) {
     _ => 'application/octet-stream',
   };
 }
+
+/// A short-lived signed URL for a private chat attachment (path in message meta).
+Future<String> _signChatAttachment(String path) => SupabaseService
+    .client.storage
+    .from('chat-attachments')
+    .createSignedUrl(path, 3600);
+
+Widget _chatImage(String url) => ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.network(
+        url,
+        width: 220,
+        fit: BoxFit.cover,
+        loadingBuilder: (c, child, p) => p == null
+            ? child
+            : const SizedBox(
+                width: 220,
+                height: 160,
+                child: Center(child: CircularProgressIndicator()),
+              ),
+        errorBuilder: (c, _, _) => const SizedBox(
+          width: 220,
+          height: 160,
+          child: Center(child: Icon(Icons.broken_image_outlined)),
+        ),
+      ),
+    );

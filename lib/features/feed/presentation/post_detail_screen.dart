@@ -83,6 +83,43 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   String _clean(Object e) =>
       e.toString().split(':').last.trim();
 
+  Future<void> _onPostMenu(String v) async {
+    final post = widget.post;
+    final repo = ref.read(feedRepositoryProvider);
+    try {
+      if (v == 'report') {
+        await repo.report(type: 'post', id: post.id);
+        if (mounted) _snack('Reported — thanks, we’ll take a look.');
+      } else if (v == 'block') {
+        await ref.read(profileRepositoryProvider).blockUser(post.authorId);
+        ref.invalidate(feedProvider);
+        if (mounted) {
+          Navigator.of(context).pop();
+          _snack('Blocked @${post.username}.');
+        }
+      } else if (v == 'delete') {
+        await repo.deletePost(post.id);
+        ref.invalidate(feedProvider);
+        if (mounted) {
+          Navigator.of(context).pop();
+          _snack('Post deleted.');
+        }
+      }
+    } catch (e) {
+      if (mounted) _snack('Something went wrong: $e');
+    }
+  }
+
+  Future<void> _reportComment(FeedComment c) async {
+    try {
+      await ref.read(feedRepositoryProvider).report(type: 'comment', id: c.id);
+      ref.invalidate(postCommentsProvider(widget.post.id));
+      if (mounted) _snack('Reported — thanks.');
+    } catch (e) {
+      if (mounted) _snack(_clean(e));
+    }
+  }
+
   void _openProfile(String userId) => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => PublicProfileScreen(userId: userId),
@@ -96,7 +133,25 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text(post.kind.label)),
+      appBar: AppBar(
+        title: Text(post.kind.label),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: _onPostMenu,
+            itemBuilder: (_) => post.authorId == _me
+                ? const [
+                    PopupMenuItem(value: 'delete', child: Text('Delete post')),
+                  ]
+                : [
+                    const PopupMenuItem(
+                        value: 'report', child: Text('Report post')),
+                    PopupMenuItem(
+                        value: 'block',
+                        child: Text('Block @${post.username}')),
+                  ],
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -147,7 +202,9 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                                 _isAsker &&
                                 _status != 'solved' &&
                                 c.authorId != _me,
+                            canReport: c.authorId != _me,
                             onMarkSolved: () => _markSolved(c),
+                            onReport: () => _reportComment(c),
                             onAuthor: () => _openProfile(c.authorId),
                           ),
                       ],
@@ -305,14 +362,18 @@ class _CommentTile extends StatelessWidget {
     required this.comment,
     required this.isSolution,
     required this.canMarkSolved,
+    required this.canReport,
     required this.onMarkSolved,
+    required this.onReport,
     required this.onAuthor,
   });
 
   final FeedComment comment;
   final bool isSolution;
   final bool canMarkSolved;
+  final bool canReport;
   final VoidCallback onMarkSolved;
+  final VoidCallback onReport;
   final VoidCallback onAuthor;
 
   @override
@@ -359,6 +420,20 @@ class _CommentTile extends StatelessWidget {
                             letterSpacing: 1,
                             color: AppColors.success)),
                   ],
+                ),
+              if (canReport)
+                SizedBox(
+                  height: 24,
+                  width: 28,
+                  child: PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.more_horiz_rounded,
+                        size: 16, color: AppColors.textFaint),
+                    onSelected: (_) => onReport(),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'report', child: Text('Report')),
+                    ],
+                  ),
                 ),
             ],
           ),

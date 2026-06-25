@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,6 +30,11 @@ Future<void> _bootstrap() async {
     await Env.load();
     await SupabaseService.init();
     await ApiConfig.init();
+    // Firebase is Android-only here; google-services.json drives config. Don't
+    // init on web/desktop (no config → would throw and break bootstrap).
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      await Firebase.initializeApp();
+    }
   } catch (e, st) {
     debugPrint('BOOTSTRAP FAILED: $e\n$st');
     runApp(_BootstrapError(message: '$e'));

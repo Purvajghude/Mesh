@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "95774771558",
+    "project_id": "mesh-98e07",
+    "storage_bucket": "mesh-98e07.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:95774771558:android:d7bc54cc7ce54721b2e0a7",
+        "android_client_info": {
+          "package_name": "com.redrob.skillapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCD6bHnGov5y1gswX4lgCVY-EiifryoTZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

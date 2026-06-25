@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_typography.dart';
+import '../../../data/services/push_service.dart';
 import '../../../data/services/supabase_service.dart';
 import '../../chat/presentation/crew_screen.dart';
 import '../../feed/presentation/feed_screen.dart';
@@ -26,6 +27,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   static const _titles = ['mesh', 'discover', 'crew', 'you'];
 
   @override
+  void initState() {
+    super.initState();
+    // We're signed in by the time the shell mounts → register for push.
+    PushService.register();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -46,7 +54,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             ),
           if (_index == 3)
             IconButton(
-              onPressed: () => SupabaseService.auth.signOut(),
+              onPressed: () async {
+                await PushService.unregister();
+                await SupabaseService.auth.signOut();
+              },
               icon: const Icon(Icons.logout_rounded),
               tooltip: 'Sign out',
             ),

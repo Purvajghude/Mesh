@@ -18,6 +18,23 @@ class AuthRepository {
 
   bool get isSignedIn => currentUser != null;
 
+  /// The GitHub username we can TRUST — only set when the user authenticated
+  /// via GitHub OAuth (so they've proven ownership). Typing a username proves
+  /// nothing, so skills imported that way must never be marked verified.
+  String? get verifiedGithubUsername {
+    final u = currentUser;
+    if (u == null) return null;
+    final providers = <String>[
+      if (u.appMetadata['provider'] is String)
+        u.appMetadata['provider'] as String,
+      ...?(u.appMetadata['providers'] as List?)?.whereType<String>(),
+    ];
+    if (!providers.contains('github')) return null;
+    final meta = u.userMetadata ?? const {};
+    final name = meta['user_name'] ?? meta['preferred_username'];
+    return (name is String && name.isNotEmpty) ? name : null;
+  }
+
   /// GitHub OAuth — the hero flow. The `read:user` scope lets us later pull
   /// repos/languages to auto-build the user's skill profile.
   Future<void> signInWithGitHub() {

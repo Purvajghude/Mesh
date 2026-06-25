@@ -152,12 +152,20 @@ the repo so Render redeploys the new backend (FIREBASE_SERVICE_ACCOUNT already s
 needed — Stage-1 client already registers tokens + receives. pg_net is fire-and-forget so a
 notify failure never blocks commenting.
 
+**Session 12 (2026-06-25) — GitHub XP + Semantic Search + Bank re-activation:**
+- **GitHub→XP wiring**: `POST /integrations/github/oauth-connect` (backend) skips nonce since OAuth already proves ownership; `IntegrationService.connectGithubOAuth` on Flutter side; called fire-and-forget in onboarding after verified GitHub import. Awards actual repo-language XP (12xp/repo, ≤60 per language; stars → Open Source XP).
+- **Semantic NL search**: `GET /search?q=` backend endpoint — embeds query via fastembed, cosine similarity against `profiles.skill_embedding` in Python, returns top 20 above 0.15 threshold. `ProfileRepository.searchProfilesSemantic` calls it; `SearchScreen` tries semantic first, falls back to text RPC if backend down. Zero new migrations.
+- **Bank re-activated**: `BankScreen` added back as tab 3 (Feed/Discover/Crew/**Bank**/You). Full credit economy (wallet, help board, escrow) is live again.
+- Analyze clean, backend imports clean.
+
 **FCM "someone needs your skill" added (migration 0033).** `/internal/notify` now takes a
 `user_ids` LIST (one backend call fans out). New trigger `notify_on_new_ask` on feed_posts: a
 new ask with skill_tags → notifies up to 25 builders who've PROVEN a matching skill (weight≥0.4,
 mirrors get_asks_for_me routing, excludes author). `notify_on_comment` updated to the list
 payload. Verified recipient query (React ask → 2 proven-React helpers, author excluded). Same
 deploy step (push backend + NOTIFY_SECRET on Render); main.py changed so the push must include it.
+**DEPLOYED (2026-06-25):** NOTIFY_SECRET set on Render + repo pushed → backend live with push.py.
+FCM push is fully end-to-end: both triggers active, no new APK needed.
 
 ---
 

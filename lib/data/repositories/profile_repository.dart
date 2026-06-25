@@ -1,11 +1,14 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/avatar_config.dart';
 import '../models/help_stat.dart';
 import '../models/my_skill.dart';
 import '../models/search_result.dart';
+import '../services/api_config.dart';
 import '../services/github_service.dart';
 import '../services/supabase_service.dart';
 
@@ -50,6 +53,25 @@ class ProfileRepository {
     return [
       for (final r in rows) SearchResult.fromJson(r as Map<String, dynamic>),
     ];
+  }
+
+  /// Semantic NL search using backend embeddings — falls back gracefully if backend is down.
+  Future<List<SearchResult>?> searchProfilesSemantic(String query) async {
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/search')
+          .replace(queryParameters: {'q': query.trim()});
+      final res = await http
+          .get(uri, headers: ApiConfig.headers())
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final list = body['results'] as List<dynamic>? ?? const [];
+      return [
+        for (final r in list) SearchResult.fromJson(r as Map<String, dynamic>),
+      ];
+    } catch (_) {
+      return null; // backend down → caller falls back to text search
+    }
   }
 
   /// Top helpers overall ([skill] null) or within one skill — the leaderboard.

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_typography.dart';
 import '../../../data/services/push_service.dart';
 import '../../../data/services/supabase_service.dart';
+import '../../bank/presentation/bank_screen.dart';
 import '../../chat/presentation/crew_screen.dart';
 import '../../feed/presentation/feed_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
@@ -24,7 +25,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
   // index 0 (feed) shows the wordmark; the rest show their title.
-  static const _titles = ['mesh', 'discover', 'crew', 'you'];
+  static const _titles = ['mesh', 'discover', 'crew', 'bank', 'you'];
 
   @override
   void initState() {
@@ -52,7 +53,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               icon: const Icon(Icons.search_rounded),
               tooltip: 'Search builders',
             ),
-          if (_index == 3)
+          if (_index == 4)
             IconButton(
               onPressed: () async {
                 await PushService.unregister();
@@ -69,6 +70,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           FeedScreen(),
           SwipeDeckScreen(),
           CrewScreen(),
+          BankScreen(),
           ProfileScreen(),
         ],
       ),
@@ -90,6 +92,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             icon: Icon(Icons.diversity_3_outlined),
             selectedIcon: Icon(Icons.diversity_3),
             label: 'Crew',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet),
+            label: 'Bank',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

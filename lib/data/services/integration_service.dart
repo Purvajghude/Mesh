@@ -87,6 +87,25 @@ class IntegrationService {
     return ConnectResult.fromJson(body);
   }
 
+  /// Award GitHub XP for a handle already proven via GitHub OAuth (no nonce needed).
+  /// Fire-and-forget safe — catches all errors so onboarding never blocks.
+  Future<ConnectResult?> connectGithubOAuth(String handle) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/integrations/github/oauth-connect'),
+            headers: ApiConfig.headers(),
+            body: jsonEncode({'handle': handle}),
+          )
+          .timeout(const Duration(seconds: 40));
+      if (res.statusCode != 200) return null;
+      return ConnectResult.fromJson(
+          jsonDecode(res.body) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<ConnectedAccount>> list() async {
     final res = await http
         .get(

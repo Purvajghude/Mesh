@@ -50,7 +50,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
     setState(() => _loading = true);
     try {
-      final res = await ref.read(profileRepositoryProvider).searchProfiles(q);
+      final repo = ref.read(profileRepositoryProvider);
+      // Try semantic search first; fall back to text search if backend is down.
+      final semantic = await repo.searchProfilesSemantic(q);
+      final res = semantic ?? await repo.searchProfiles(q);
       if (mounted && _controller.text.trim() == q) {
         setState(() {
           _results = res;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:gap/gap.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_typography.dart';
+import '../../../data/data_providers.dart';
 import '../../../data/services/github_service.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/onboarding_providers.dart';
@@ -64,6 +67,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await ref
           .read(profileRepositoryProvider)
           .saveGithubImport(data, verified: _ownershipVerified);
+      if (_ownershipVerified) {
+        final verifiedUser =
+            ref.read(authRepositoryProvider).verifiedGithubUsername;
+        if (verifiedUser != null) {
+          // Fire-and-forget: award XP based on actual GitHub repos. Never
+          // blocks onboarding — the backend is best-effort during onboarding.
+          unawaited(ref
+              .read(integrationServiceProvider)
+              .connectGithubOAuth(verifiedUser));
+        }
+      }
       ref.read(onboardingStatusProvider.notifier).markOnboarded();
       // Router redirects to /home once onboarded flips.
     } catch (e) {

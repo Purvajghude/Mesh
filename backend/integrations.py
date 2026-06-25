@@ -417,6 +417,76 @@ def connect_account(
     }
 
 
+def connect_github_oauth(db: Client, user_id: str, handle: str) -> dict[str, Any]:
+    """Award GitHub XP for a handle already proven via GitHub OAuth — no nonce needed."""
+    handle = (handle or "").strip().lstrip("@")
+    if not handle:
+        raise ValueError("GitHub handle required")
+
+    existing = (
+        db.table("connected_accounts")
+        .select("granted_xp")
+        .eq("profile_id", user_id)
+        .eq("provider", "github")
+        .execute()
+        .data
+    )
+    row = existing[0] if existing else None
+    prev: dict[str, float] = (row.get("granted_xp") if row else {}) or {}
+
+    stats = _github_fetch(handle)
+
+    new_granted: dict[str, float] = {}
+    reasons: dict[str, str] = {}
+    for skill_name, points, reason in _github_grants(stats):
+        new_granted[skill_name] = new_granted.get(skill_name, 0) + float(points)
+        reasons.setdefault(skill_name, reason)
+
+    awarded: list[dict[str, Any]] = []
+    for skill_name, points in new_granted.items():
+        delta = points - float(prev.get(skill_name, 0))
+        if delta <= 0:
+            continue
+        skill_id, _ = skills_api._find_or_create_skill(db, skill_name)
+        db.rpc(
+            "award_skill_xp",
+            {
+                "p_profile": user_id,
+                "p_skill": skill_id,
+                "p_source": "integration",
+                "p_points": delta,
+                "p_ref": f"github:{handle}",
+            },
+        ).execute()
+        awarded.append(
+            {"skill": skill_name, "xp": round(delta, 1), "why": reasons[skill_name]}
+        )
+
+    skills_api._recompute_profile_vector(db, user_id)
+
+    db.table("connected_accounts").upsert(
+        {
+            "profile_id": user_id,
+            "provider": "github",
+            "handle": handle,
+            "stats": stats,
+            "granted_xp": {**prev, **new_granted},
+            "verified": True,
+            "verify_nonce": None,
+            "last_synced_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="profile_id,provider",
+    ).execute()
+
+    return {
+        "provider": "github",
+        "label": "GitHub",
+        "handle": handle,
+        "summary": _github_summary(stats),
+        "awarded": awarded,
+    }
+
+
 def list_accounts(db: Client, user_id: str) -> list[dict[str, Any]]:
     rows = (
         db.table("connected_accounts")

@@ -25,6 +25,7 @@ from supabase import Client, create_client
 import deck as deck_engine
 import feed_ai
 import integrations
+from embeddings import embed_one
 import portfolio as portfolio_engine
 import push
 import skills_api
@@ -172,6 +173,56 @@ async def get_deck(limit: int = 20, uid: str = Depends(current_user)):
     return {"deck": ranked}
 
 
+@app.get("/search")
+async def semantic_search(q: str, uid: str = Depends(current_user)):
+    """Natural-language profile search using skill embeddings (cosine similarity)."""
+    import numpy as np
+
+    q = q.strip()
+    if not q:
+        return {"results": []}
+
+    qvec = np.array(await asyncio.to_thread(embed_one, q))
+
+    rows = await asyncio.to_thread(
+        lambda: _db.table("profiles")
+        .select(
+            "id, username, display_name, vibe_statement, skill_embedding,"
+            " avatar_config, help_karma, helps_count"
+        )
+        .eq("onboarded", True)
+        .neq("id", uid)
+        .execute()
+        .data
+    )
+
+    scored = []
+    for r in rows:
+        pv = deck_engine._parse_vec(r.get("skill_embedding"))
+        if pv is None:
+            continue
+        sim = float(np.dot(qvec, np.array(pv)))
+        scored.append((sim, r))
+    scored.sort(key=lambda x: -x[0])
+
+    return {
+        "results": [
+            {
+                "id": r["id"],
+                "username": r["username"],
+                "display_name": r["display_name"],
+                "vibe_statement": r["vibe_statement"],
+                "avatar_config": r["avatar_config"],
+                "help_karma": r.get("help_karma") or 0,
+                "helps_count": r.get("helps_count") or 0,
+                "matched_skill": q,
+            }
+            for sim, r in scored[:20]
+            if sim > 0.15
+        ]
+    }
+
+
 @app.post("/profile/skills")
 @limiter.limit("20/minute")
 async def add_skill(
@@ -243,6 +294,25 @@ async def integration_connect(
     try:
         result = await asyncio.to_thread(
             integrations.connect_account, _db, uid, req.provider, req.handle
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return result
+
+
+class GithubOAuthRequest(BaseModel):
+    handle: str
+
+
+@app.post("/integrations/github/oauth-connect")
+@limiter.limit("5/minute")
+async def github_oauth_connect(
+    request: Request, req: GithubOAuthRequest, uid: str = Depends(current_user)
+):
+    """Award GitHub XP for a handle proven via GitHub OAuth (no bio-nonce needed)."""
+    try:
+        result = await asyncio.to_thread(
+            integrations.connect_github_oauth, _db, uid, req.handle
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
